@@ -179,6 +179,7 @@ enum AVPixelFormat {
     AV_PIX_FMT_YUVA444P16BE, ///< planar YUV 4:4:4 64bpp, (1 Cr & Cb sample per 1x1 Y & A samples, big-endian)
     AV_PIX_FMT_YUVA444P16LE, ///< planar YUV 4:4:4 64bpp, (1 Cr & Cb sample per 1x1 Y & A samples, little-endian)
     AV_PIX_FMT_VDPAU,     ///< HW acceleration through VDPAU, Picture.data[3] contains a VdpVideoSurface
+    AV_PIX_FMT_QSV_H264,  ///< H264/AVC HW decode with QSV, data[2] contains qsv_atom information for MFX_IOPATTERN_OUT_OPAQUE_MEMORY, MFX_IOPATTERN_OUT_VIDEO_MEMORY
     AV_PIX_FMT_NB,        ///< number of pixel formats, DO NOT USE THIS if you want to link with shared libav* because the number of formats might differ between versions
 
 #if FF_API_PIX_FMT

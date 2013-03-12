@@ -130,6 +130,7 @@ Component options:
 
 Hardware accelerators:
   --enable-dxva2           enable DXVA2 code
+  --enable-qsv             enable QSV code
   --enable-vaapi           enable VAAPI code
   --enable-vda             enable VDA code
   --enable-vdpau           enable VDPAU code
@@ -1062,6 +1063,7 @@ EXTERNAL_LIBRARY_LIST="
 
 HWACCEL_LIST="
     dxva2
+    qsv
     vaapi
     vda
     vdpau
@@ -1640,6 +1642,8 @@ zmbv_encoder_select="zlib"
 
 # hardware accelerators
 dxva2_deps="dxva2api_h"
+qsv_deps="mfx_mfxvideo_h"
+qsv_extralibs="-lmfx -lstdc++"
 vaapi_deps="va_va_h"
 vda_deps="VideoDecodeAcceleration_VDADecoder_h pthreads"
 vda_extralibs="-framework CoreFoundation -framework VideoDecodeAcceleration -framework QuartzCore"
@@ -1651,6 +1655,8 @@ h263_vdpau_hwaccel_deps="vdpau"
 h263_vdpau_hwaccel_select="h263_decoder"
 h264_dxva2_hwaccel_deps="dxva2"
 h264_dxva2_hwaccel_select="h264_decoder"
+h264_qsv_decoder_deps="qsv"
+h264_qsv_decoder_select="h264_decoder"
 h264_vaapi_hwaccel_deps="vaapi"
 h264_vaapi_hwaccel_select="h264_decoder"
 h264_vda_hwaccel_deps="vda"
@@ -3486,6 +3492,7 @@ check_header sys/resource.h
 check_header sys/select.h
 check_header sys/time.h
 check_header unistd.h
+check_header mfx/mfxvideo.h
 check_header vdpau/vdpau.h
 check_header vdpau/vdpau_x11.h
 check_header VideoDecodeAcceleration/VDADecoder.h

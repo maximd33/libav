@@ -25,6 +25,10 @@
  *
  */
 
+#include <stdint.h>
+#include <sys/types.h>
+
+#include "avcodec.h"
 #include "qsv_h264.h"
 
 static av_qsv_config av_qsv_default_config = {
@@ -108,8 +112,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     AV_QSV_ZERO_MEMORY(qsv_decode->bs);
     qsv_decode->m_mfxVideoParam.mfx.CodecId = MFX_CODEC_AVC;
     qsv_decode->m_mfxVideoParam.IOPattern   = qsv_config_context->io_pattern;
-
-    qsv_decode->m_mfxVideoParam.AsyncDepth = qsv_config_context->async_depth;
+    qsv_decode->m_mfxVideoParam.AsyncDepth  = qsv_config_context->async_depth;
 
     current_position = avctx->extradata;
     current_size     = avctx->extradata_size;
@@ -121,13 +124,17 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
             unsigned char nal_type = current_position[current_offset + 2] & 0x1F;
 
             if (nal_type == NAL_SPS || nal_type == NAL_PPS) {
-                memcpy(&qsv_decode->p_buf[header_size], ff_prefix_code, sizeof(ff_prefix_code));
+                memcpy(&qsv_decode->p_buf[header_size], ff_prefix_code,
+                       sizeof(ff_prefix_code));
                 header_size += sizeof(ff_prefix_code);
-                memcpy(&qsv_decode->p_buf[header_size], &current_position[current_offset + 2], current_nal_size);
+                memcpy(&qsv_decode->p_buf[header_size],
+                       &current_position[current_offset + 2],
+                       current_nal_size);
 
                 // fix for PPS as it comes after SPS, so - last
                 if (nal_type == NAL_PPS) {
-                    // fix of MFXVideoDECODE_DecodeHeader: needs one SLICE to find, any SLICE
+                    /* fix of MFXVideoDECODE_DecodeHeader: needs one SLICE
+                     * to find, any SLICE */
                     memcpy(&qsv_decode->p_buf[header_size + current_nal_size],
                            ff_slice_code, current_nal_size);
                     header_size += sizeof(ff_slice_code);
@@ -140,7 +147,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     } else {
         memcpy(&qsv_decode->p_buf[0], avctx->extradata, avctx->extradata_size);
         header_size = avctx->extradata_size;
-        memcpy(&qsv_decode->p_buf[header_size], ff_slice_code, sizeof(ff_slice_code));
+        memcpy(&qsv_decode->p_buf[header_size], ff_slice_code,
+               sizeof(ff_slice_code));
         header_size += sizeof(ff_slice_code);
     }
 
@@ -169,7 +177,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
                                     qsv_config_context->async_depth +
-                                    qsv_config_context->additional_buffers, AV_QSV_SURFACE_NUM);
+                                    qsv_config_context->additional_buffers,
+                                    AV_QSV_SURFACE_NUM);
     if (qsv_decode->surface_num <= 0)
         qsv_decode->surface_num = AV_QSV_SURFACE_NUM;
 
@@ -187,25 +196,26 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
         qsv_decode->request[0].NumFrameMin       = qsv_decode->surface_num;
         qsv_decode->request[0].NumFrameSuggested = qsv_decode->surface_num;
 
-        qsv_decode->request[0].Type = MFX_MEMTYPE_EXTERNAL_FRAME | MFX_MEMTYPE_FROM_DECODE;
+        qsv_decode->request[0].Type  = MFX_MEMTYPE_EXTERNAL_FRAME |
+                                       MFX_MEMTYPE_FROM_DECODE;
         qsv_decode->request[0].Type |= MFX_MEMTYPE_SYSTEM_MEMORY;
 
-        qsv_config_context->allocators->
-        frame_alloc.Alloc(qsv_config_context->allocators,
-                          &qsv_decode->request[0],
-                          &qsv_decode->response);
+        qsv_config_context->allocators->frame_alloc.Alloc(qsv_config_context->allocators,
+                                                          &qsv_decode->request[0],
+                                                          &qsv_decode->response);
     }
 
     for (int i = 0; i < qsv_decode->surface_num; i++) {
         qsv_decode->p_surfaces[i] = av_mallocz(sizeof(mfxFrameSurface1));
         AV_QSV_CHECK_POINTER(qsv_decode->p_surfaces[i], AVERROR(ENOMEM));
-        memcpy(&(qsv_decode->p_surfaces[i]->Info), &(qsv_decode->request[0].Info), sizeof(mfxFrameInfo));
+        memcpy(&(qsv_decode->p_surfaces[i]->Info),
+               &(qsv_decode->request[0].Info),
+               sizeof(mfxFrameInfo));
 
         if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            sts = qsv_config_context->allocators->
-                  frame_alloc.Lock(qsv_config_context->allocators,
-                                   qsv_decode->response.mids[i],
-                                   &(qsv_decode->p_surfaces[i]->Data));
+            sts = qsv_config_context->allocators->frame_alloc.Lock(qsv_config_context->allocators,
+                                                                   qsv_decode->response.mids[i],
+                                                                   &(qsv_decode->p_surfaces[i]->Data));
             AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
         }
     }
@@ -219,13 +229,13 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(mfxExtOpaqueSurfaceAlloc));
 
     if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_OPAQUE_MEMORY) {
-        qsv_decode->ext_opaque_alloc.Header.BufferId = MFX_EXTBUFF_OPAQUE_SURFACE_ALLOCATION;
-        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(mfxExtOpaqueSurfaceAlloc);
         qsv_decode->p_ext_params                     = (mfxExtBuffer *)&qsv_decode->ext_opaque_alloc;
 
-        qsv_decode->ext_opaque_alloc.Out.Surfaces   = qsv_decode->p_surfaces;
-        qsv_decode->ext_opaque_alloc.Out.NumSurface = qsv_decode->surface_num;
-        qsv_decode->ext_opaque_alloc.Out.Type       = qsv_decode->request[0].Type;
+        qsv_decode->ext_opaque_alloc.Header.BufferId = MFX_EXTBUFF_OPAQUE_SURFACE_ALLOCATION;
+        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(mfxExtOpaqueSurfaceAlloc);
+        qsv_decode->ext_opaque_alloc.Out.Surfaces    = qsv_decode->p_surfaces;
+        qsv_decode->ext_opaque_alloc.Out.NumSurface  = qsv_decode->surface_num;
+        qsv_decode->ext_opaque_alloc.Out.Type        = qsv_decode->request[0].Type;
 
         qsv_decode->m_mfxVideoParam.ExtParam    = &qsv_decode->p_ext_params;
         qsv_decode->m_mfxVideoParam.NumExtParam = 1;
@@ -238,7 +248,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     return ret;
 }
 
-int ff_qsv_decode_init(AVCodecContext *avctx)
+av_cold int ff_qsv_decode_init(AVCodecContext *avctx)
 {
     av_qsv_context *qsv;
     av_qsv_space *qsv_decode;
@@ -258,7 +268,8 @@ int ff_qsv_decode_init(AVCodecContext *avctx)
         return 0;
 
     qsv_decode->p_buf_max_size = AV_QSV_BUF_SIZE_DEFAULT;
-    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size, sizeof(uint8_t));
+    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size,
+                                                 sizeof(uint8_t));
     if (!qsv_decode->p_buf)
         return AVERROR(ENOMEM);
 
@@ -295,16 +306,20 @@ static int qsv_decode_end(AVCodecContext *avctx)
             av_log(avctx, AV_LOG_QUIET,
                    "qsv_decode report done, max_surfaces: %u/%u , max_syncs: %u/%u\n",
                    qsv_decode->surface_num_max_used,
-                   qsv_decode->surface_num, qsv_decode->sync_num_max_used,
+                   qsv_decode->surface_num,
+                   qsv_decode->sync_num_max_used,
                    qsv_decode->sync_num);
         }
 
-        if (qsv_config_context && qsv_config_context->io_pattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+        if (qsv_config_context &&
+            qsv_config_context->io_pattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
             if (qsv_config_context->allocators) {
-                sts = qsv_config_context->allocators->frame_alloc.Free(qsv_config_context->allocators, &qsv_decode->response);
+                sts = qsv_config_context->allocators->frame_alloc.Free(qsv_config_context->allocators,
+                                                                       &qsv_decode->response);
                 AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
             } else
-                av_log(avctx, AV_LOG_FATAL, "No QSV allocators found for clean up\n");
+                av_log(avctx, AV_LOG_FATAL,
+                       "No QSV allocators found for cleanup\n");
         }
         // closing the own resources
         av_freep(&qsv_decode->p_buf);
@@ -402,15 +417,20 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
         if (qsv_config_context->dts_need) {
             //not a drain
-            if ((current_size || qsv_decode->bs.DataLength))
-                av_qsv_dts_ordered_insert(qsv, 0, 0, qsv_decode->bs.TimeStamp, 0);
+            if (current_size || qsv_decode->bs.DataLength)
+                av_qsv_dts_ordered_insert(qsv, 0, 0,
+                                          qsv_decode->bs.TimeStamp, 0);
         }
 
         sts = MFX_ERR_NONE;
         // ignore warnings, where warnings >0 , and not error codes <0
-        while (MFX_ERR_NONE <= sts || MFX_ERR_MORE_SURFACE == sts || MFX_WRN_DEVICE_BUSY == sts) {
+        while (MFX_ERR_NONE         <= sts ||
+               MFX_ERR_MORE_SURFACE == sts ||
+               MFX_WRN_DEVICE_BUSY  == sts) {
             if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
-                surface_idx = av_qsv_get_free_surface(qsv_decode, qsv, &qsv_decode->request[0].Info, QSV_PART_ANY);
+                surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
+                                                      &qsv_decode->request[0].Info,
+                                                      QSV_PART_ANY);
                 if (surface_idx == -1) {
                     *got_picture_ptr = 0;
                     return 0;
@@ -451,9 +471,11 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                 new_stage->in.p_bs      = input_bs;
                 new_stage->in.p_surface = qsv_decode->p_surfaces[surface_idx];
 
-                // see MFXVideoDECODE_DecodeFrameAsync , will be filled from there, if output
+                /* see MFXVideoDECODE_DecodeFrameAsync, will be filled
+                 * from there, if output */
                 new_stage->out.p_sync = qsv_decode->p_sync[sync_idx];
-                if (!qsv_config_context->resource_free || qsv_config_context->usage_threaded) {
+                if (!qsv_config_context->resource_free ||
+                    qsv_config_context->usage_threaded) {
                     pipe = av_qsv_list_init(HAVE_THREADS ?
                                             qsv_config_context->usage_threaded :
                                             HAVE_THREADS);
@@ -468,13 +490,13 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                     qsv_atom = 0;
                 }
 
-                // usage for forced decode sync and results, can be avoided if sync done by next stage
-                // also note wait time for Sync and possible usage with MFX_WRN_IN_EXECUTION check
+                /* Usage for forced decode sync and results, can be avoided if
+                 * sync done by next stage. Also note wait time for Sync and
+                 * possible usage with MFX_WRN_IN_EXECUTION check. */
                 if (qsv_config_context->sync_need) {
                     sts = MFXVideoCORE_SyncOperation(qsv->mfx_session,
                                                      *new_stage->out.p_sync,
-                                                     qsv_config_context->
-                                                     sync_need);
+                                                     qsv_config_context->sync_need);
                     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
                     // no need to wait more -> force off
@@ -487,12 +509,14 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             }
             av_qsv_stage_clean(&new_stage);
 
-            // Can be because of:
-            // - runtime situation:
-            // - drain procedure:
-            // At the end of the bitstream, the application continuously calls the MFXVideoDECODE_DecodeFrameAsync function with a
-            // NULL bitstream pointer to drain any remaining frames cached within the Intel
-            // Media SDK decoder, until the function returns MFX_ERR_MORE_DATA.
+            /* Can be because of:
+             * - runtime situation:
+             * - drain procedure:
+             * At the end of the bitstream, the application continuously calls
+             * the MFXVideoDECODE_DecodeFrameAsync function with a NULL
+             * bitstream pointer to drain any remaining frames cached within
+             * the Intel Media SDK decoder, until the function returns
+             * MFX_ERR_MORE_DATA. */
             if (MFX_ERR_MORE_DATA == sts) {
                 // not a drain
                 if (current_size) {
@@ -529,9 +553,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         picture->pkt_pts = avpkt->pts;
         picture->pts     = avpkt->pts;
 
-        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_TFF;
         picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_PROGRESSIVE);
-        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_FIELD_TFF;
 
         // since we do not know it yet from MSDK, let's do just a simple way for now
         picture->key_frame = (avctx->frame_number == 0) ? 1 : 0;
@@ -600,13 +624,14 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
         nbytes = width * height + width * height + width * height + width * height;
         break;
     case MFX_FOURCC_YUY2:
-        nbytes = width * height + (width >> 1) * (height) + (width >> 1) * (height);
+        nbytes = width * height + (width >> 1) * height + (width >> 1) * height;
         break;
     default:
         return MFX_ERR_UNSUPPORTED;
     }
 
-    this_alloc->space->mids = av_malloc_array(request->NumFrameSuggested, sizeof(mfxMemId));
+    this_alloc->space->mids = av_malloc_array(request->NumFrameSuggested,
+                                              sizeof(mfxMemId));
     if (!this_alloc->space->mids)
         return MFX_ERR_MEMORY_ALLOC;
 
@@ -614,19 +639,22 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
     for (numAllocated = 0; numAllocated < request->NumFrameSuggested; numAllocated++) {
         sts = this_alloc->buffer_alloc.Alloc(this_alloc->buffer_alloc.pthis,
                                              nbytes + AV_QSV_ALIGN32(sizeof(av_qsv_alloc_frame)),
-                                             request->Type, &(this_alloc->space->mids[numAllocated]));
+                                             request->Type,
+                                             &this_alloc->space->mids[numAllocated]);
 
         if (MFX_ERR_NONE != sts)
             break;
 
         sts = this_alloc->buffer_alloc.Lock(this_alloc->buffer_alloc.pthis,
-                                            this_alloc->space->mids[numAllocated],(mfxU8 **)&fs);
+                                            this_alloc->space->mids[numAllocated],
+                                            (mfxU8 **)&fs);
         if (MFX_ERR_NONE != sts)
             break;
 
         fs->id   = AV_QSV_ID_FRAME;
         fs->info = request->Info;
-        this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, this_alloc->space->mids[numAllocated]);
+        this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis,
+                                        this_alloc->space->mids[numAllocated]);
     }
 
     // check the number of allocated frames
@@ -639,8 +667,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid,
-                                mfxFrameData *ptr)
+mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     mfxStatus sts          = MFX_ERR_NONE;
     av_qsv_alloc_frame *fs = 0;
@@ -654,7 +681,8 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid,
     if (!ptr)
         return MFX_ERR_NULL_PTR;
 
-    sts = this_alloc->buffer_alloc.Lock(this_alloc->buffer_alloc.pthis, mid, (mfxU8 **)&fs);
+    sts = this_alloc->buffer_alloc.Lock(this_alloc->buffer_alloc.pthis,
+                                        mid, (mfxU8 **)&fs);
 
     if (MFX_ERR_NONE != sts)
         return sts;
@@ -666,7 +694,8 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid,
 
     width  = (mfxU16)AV_QSV_ALIGN32(fs->info.Width);
     height = (mfxU16)AV_QSV_ALIGN32(fs->info.Height);
-    ptr->B = ptr->Y = (mfxU8 *)fs + AV_QSV_ALIGN32(sizeof(av_qsv_allocators_space));
+    ptr->B =
+    ptr->Y = (mfxU8 *)fs + AV_QSV_ALIGN32(sizeof(av_qsv_allocators_space));
 
     switch (fs->info.FourCC) {
     case MFX_FOURCC_NV12:
@@ -702,8 +731,7 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid,
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid,
-                                  mfxFrameData *ptr)
+mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     mfxStatus sts                       = MFX_ERR_NONE;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
@@ -723,14 +751,12 @@ mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid,
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid,
-                                  mfxHDL *handle)
+mfxStatus ff_qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle)
 {
     return MFX_ERR_UNSUPPORTED;
 }
 
-mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis,
-                                mfxFrameAllocResponse *response)
+mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 {
     mfxStatus sts                       = MFX_ERR_NONE;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
@@ -745,7 +771,8 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis,
     if (response->mids)
         for (i = 0; i < response->NumFrameActual; i++)
             if (response->mids[i]) {
-                sts = this_alloc->buffer_alloc.Free(this_alloc->buffer_alloc.pthis, response->mids[i]);
+                sts = this_alloc->buffer_alloc.Free(this_alloc->buffer_alloc.pthis,
+                                                    response->mids[i]);
                 if (MFX_ERR_NONE != sts)
                     return sts;
             }
@@ -830,5 +857,6 @@ AVCodec ff_h264_qsv_decoder = {
     .capabilities = CODEC_CAP_DELAY,
     .flush        = qsv_flush_dpb,
     .long_name    = NULL_IF_CONFIG_SMALL("H.264 / AVC / Intel QSV"),
-    .pix_fmts     = (const enum PixelFormat[]) { AV_PIX_FMT_QSV, AV_PIX_FMT_NONE },
+    .pix_fmts     = (const enum PixelFormat[]) { AV_PIX_FMT_QSV_H264,
+                                                 AV_PIX_FMT_NONE },
 };
