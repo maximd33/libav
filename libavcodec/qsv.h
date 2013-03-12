@@ -107,41 +107,15 @@
 
 #include <stdint.h>
 #include <string.h>
-
-#ifdef HAVE_AV_CONFIG_H
-#include "config.h"
-#endif
-
-#if HAVE_THREADS
-// atomic ops
-#if defined (__GNUC__)
-#define ff_qsv_atomic_inc(ptr) __sync_add_and_fetch(ptr, 1)
-#define ff_qsv_atomic_dec(ptr) __sync_sub_and_fetch(ptr, 1)
-#elif HAVE_WINDOWS_H               // MSVC case
-#include <windows.h>
-#define ff_qsv_atomic_inc(ptr) InterlockedIncrement(ptr)
-#define ff_qsv_atomic_dec(ptr) InterlockedDecrement(ptr)
-#endif
-// threading implementation
-#if HAVE_PTHREADS
-#include <pthread.h>
-#elif HAVE_W32THREADS
-#include "w32pthreads.h"
-#endif
-#else
-#define ff_qsv_atomic_inc(ptr) ((*ptr)++)
-#define ff_qsv_atomic_dec(ptr) ((*ptr)--)
-#endif
-
 #include <mfx/mfxvideo.h>
-#include "libavutil/mem.h"
-#include "libavutil/time.h"
+
+#include "libavutil/log.h"
 
 // sleep is defined in milliseconds
 #define av_qsv_sleep(x) av_usleep((x) * 1000)
 
 #define AV_QSV_ZERO_MEMORY(VAR)     { memset(&VAR, 0, sizeof(VAR)); }
-#define AV_QSV_ALIGN32(X)           (((mfxU32)((X)+31)) & (~(mfxU32)31))
+#define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
 #define AV_QSV_ALIGN16(value)       (((value + 15) >> 4) << 4)
 #ifndef AV_QSV_PRINT_RET_MSG
 #define AV_QSV_PRINT_RET_MSG(ERR)                                       \
@@ -334,7 +308,8 @@ typedef struct av_qsv_config {
     int num_ref_frame;
 
     /**
-     * Distance between I- or P- key frames; if it is zero, the GOP structure is unspecified.
+     * Distance between I- or P- key frames; if it is zero,
+     * the GOP structure is unspecified.
      * Note: If GopRefDist = 1 no B-frames are used.
      *
      * - encoding: Set by user.
@@ -343,8 +318,9 @@ typedef struct av_qsv_config {
     int gop_ref_dist;
 
     /**
-     * Number of pictures within the current GOP (Group of Pictures); if GopPicSize=0,
-     * then the GOP size is unspecified. If GopPicSize=1, only I-frames are used.
+     * Number of pictures within the current GOP (Group of Pictures);
+     * if GopPicSize=0, then the GOP size is unspecified.
+     * If GopPicSize=1, only I-frames are used.
      *
      * - encoding: Set by user.
      * - decoding: unused
@@ -361,7 +337,7 @@ typedef struct av_qsv_config {
     int io_pattern;
 
     /**
-     * Set amount of additional surfaces might be needed
+     * Set amount of additional surfaces that might be needed.
      * Format: amount of additional buffers(surfaces+syncs)
      * to allocate in advance
      *
@@ -414,15 +390,15 @@ typedef struct av_qsv_config {
     int usage_threaded;
 
     /**
-     * If QSV use an external allocation (valid per session/mfxSession)
+     * If QSV uses an external allocation (valid per session/mfxSession).
      * Format: pointer to allocators, if default: 0
      *
      * note that:
      * System Memory:   can be used without provided and external allocator,
      *  meaning MediaSDK will use an internal one
      * Video Memory:    in this case - we must provide an external allocator
-     * Also, Media SDK session doesn't require external allocator if the application
-     *  uses opaque memory
+     * Also, Media SDK session does not require external allocator if the
+     *  application uses opaque memory
      *
      * Calls SetFrameAllocator/SetBufferAllocator
      * (MFXVideoCORE_SetFrameAllocator/MFXVideoCORE_SetBufferAllocator)
@@ -437,7 +413,8 @@ typedef struct av_qsv_config {
 static const uint8_t ff_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
 
 int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv);
-int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv, mfxFrameInfo *info, av_qsv_split part);
+int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
+                            mfxFrameInfo *info, av_qsv_split part);
 int av_qsv_get_free_encode_task(av_qsv_list *tasks);
 
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver);
@@ -447,13 +424,16 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded);
 void av_qsv_pipe_list_create(av_qsv_list **list, int is_threaded);
 void av_qsv_pipe_list_clean(av_qsv_list **list);
 
-void av_qsv_add_stagee(av_qsv_list **list, av_qsv_stage *stage, int is_threaded);
+void av_qsv_add_stagee(av_qsv_list **list, av_qsv_stage *stage,
+                       int is_threaded);
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list);
-av_qsv_stage *av_qsv_get_by_mask(av_qsv_list *list, int mask, av_qsv_stage **prev, av_qsv_list **this_pipe);
+av_qsv_stage *av_qsv_get_by_mask(av_qsv_list *list, int mask,
+                                 av_qsv_stage **prev, av_qsv_list **this_pipe);
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage);
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item);
 
-void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end, int64_t dts, int iter);
+void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
+                               int64_t dts, int iter);
 void av_qsv_dts_pop(av_qsv_context *qsv);
 
 av_qsv_stage *av_qsv_stage_init(void);
@@ -473,4 +453,4 @@ void av_qsv_list_close(av_qsv_list **);
 
 /* @} */
 
-#endif //AVCODEC_QSV_H
+#endif /* AVCODEC_QSV_H */

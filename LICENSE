@@ -37,6 +37,11 @@ There are a handful of files under other licensing terms, namely:
   You must also indicate any changes including additions and deletions to
   those three files in the documentation.
 
+* The files libavcodec/qsv.[ch], libavcodec/qsv_h264.[ch] were submitted by
+  Intel under a 3-clause BSD license, see the top of the files for licensing
+  details. Specifically note that you must reproduce the licensing terms in
+  your documentation if you enable QSV.
+
 
 external libraries
 ==================

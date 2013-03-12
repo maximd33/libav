@@ -28,16 +28,20 @@
 #ifndef AVCODEC_QSV_H264_H
 #define AVCODEC_QSV_H264_H
 
+#include <stdint.h>
+#include <sys/types.h>
+#include <mfx/mfxvideo.h>
+
+#include "avcodec.h"
 #include "qsv.h"
-#include "h264.h"
-#include "h264data.h"
 
 int ff_qsv_dec_init(AVCodecContext *);
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size);
 
-int ff_qsv_decode_init(AVCodecContext *avctx);
-static int qsv_decode_end(AVCodecContext *avctx);
-static int qsv_decode_frame(AVCodecContext *avctx, void *data, int *data_size, AVPacket *avpkt);
+av_cold int ff_qsv_decode_init(AVCodecContext * avctx);
+static int qsv_decode_end(AVCodecContext * avctx);
+static int qsv_decode_frame(AVCodecContext * avctx, void *data,
+                            int *data_size, AVPacket * avpkt);
 static void qsv_flush_dpb(AVCodecContext *avctx);
 
 // Default for SYSTEM MEMORY
@@ -60,4 +64,4 @@ mfxStatus ff_qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr);
 mfxStatus ff_qsv_mem_buffer_unlock(mfxHDL pthis, mfxMemId mid);
 mfxStatus ff_qsv_mem_buffer_free(mfxHDL pthis, mfxMemId mid);
 
-#endif  //AVCODEC_QSV_H264_H
+#endif /* AVCODEC_QSV_H264_H */

@@ -25,14 +25,36 @@
  *
  */
 
-#include "qsv.h"
 #include "avcodec.h"
 #include "internal.h"
+#include "qsv.h"
+#include "config.h"
+
+#if HAVE_THREADS
+// atomic ops
+#if defined (__GNUC__)
+#define ff_qsv_atomic_inc(ptr) __sync_add_and_fetch(ptr, 1)
+#define ff_qsv_atomic_dec(ptr) __sync_sub_and_fetch(ptr, 1)
+#elif HAVE_WINDOWS_H               // MSVC case
+#include <windows.h>
+#define ff_qsv_atomic_inc(ptr) InterlockedIncrement(ptr)
+#define ff_qsv_atomic_dec(ptr) InterlockedDecrement(ptr)
+#endif
+// threading implementation
+#if HAVE_PTHREADS
+#include <pthread.h>
+#elif HAVE_W32THREADS
+#include "w32pthreads.h"
+#endif
+#else
+#define ff_qsv_atomic_inc(ptr) ((*ptr)++)
+#define ff_qsv_atomic_dec(ptr) ((*ptr)--)
+#endif
 
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 {
-    int ret = MFX_ERR_NOT_FOUND;
-    int i   = 0;
+    int i, ret = MFX_ERR_NOT_FOUND;
+
     if (tasks)
         for (i = 0; i < av_qsv_list_count(tasks); i++) {
             av_qsv_task *task = av_qsv_list_item(tasks, i);
@@ -47,12 +69,12 @@ int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 
 int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
 {
-    int ret     = -1;
-    int counter = 0;
+    int ret = -1, counter = 0;
 
     while (1) {
         for (int i = 0; i < space->sync_num; i++)
-            if (!(*(space->p_sync[i])) && !ff_qsv_is_sync_in_pipe(space->p_sync[i], qsv)) {
+            if (!(*(space->p_sync[i])) &&
+                !ff_qsv_is_sync_in_pipe(space->p_sync[i], qsv)) {
                 if (i > space->sync_num_max_used)
                     space->sync_num_max_used = i;
                 return i;
@@ -61,7 +83,8 @@ int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
 #if HAVE_THREADS
         if (++counter >= AV_QSV_REPEAT_NUM_DEFAULT) {
 #endif
-        av_log(NULL, AV_LOG_FATAL, "Have not enough to have %d sync point(s) allocated\n",
+        av_log(NULL, AV_LOG_FATAL,
+               "Have not enough to have %d sync point(s) allocated\n",
                space->sync_num);
         break;
 #if HAVE_THREADS
@@ -72,12 +95,10 @@ int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
     return ret;
 }
 
-int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv, mfxFrameInfo *info, av_qsv_split part)
+int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
+                            mfxFrameInfo *info, av_qsv_split part)
 {
-    int ret     = -1;
-    int from    = 0;
-    int up      = space->surface_num;
-    int counter = 0;
+    int ret = -1, from, up, counter = 0;
 
     while (1) {
         from = 0;
@@ -88,7 +109,8 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv, mfxFrameIn
             from = up / 2;
 
         for (int i = from; i < up; i++)
-            if ((!space->p_surfaces[i]->Data.Locked) && !ff_qsv_is_surface_in_pipe(space->p_surfaces[i], qsv)) {
+            if ((!space->p_surfaces[i]->Data.Locked) &&
+                !ff_qsv_is_surface_in_pipe(space->p_surfaces[i], qsv)) {
                 memcpy(&(space->p_surfaces[i]->Info), info,
                        sizeof(mfxFrameInfo));
                 if (i > space->surface_num_max_used)
@@ -117,9 +139,7 @@ int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
     av_qsv_list *list   = 0;
     av_qsv_stage *stage = 0;
 
-    if (!p_surface)
-        return ret;
-    if (!qsv->pipes)
+    if (!p_surface || !qsv->pipes)
         return ret;
 
     for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
@@ -142,9 +162,7 @@ int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
     av_qsv_list *list   = 0;
     av_qsv_stage *stage = 0;
 
-    if (!sync)
-        return ret;
-    if (!qsv->pipes)
+    if (!sync || !qsv->pipes)
         return ret;
 
     for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
@@ -175,9 +193,8 @@ void av_qsv_stage_clean(av_qsv_stage **stage)
 
 void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 {
-    int is_active = 0;
+    int is_active = ff_qsv_atomic_inc(&qsv->is_context_active);
 
-    is_active = ff_qsv_atomic_inc(&qsv->is_context_active);
     if (is_active == 1) {
         memset(&qsv->mfx_session, 0, sizeof(mfxSession));
         av_qsv_pipe_list_create(&qsv->pipes, is_threaded);
@@ -197,10 +214,8 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 
 int av_qsv_context_clean(av_qsv_context *qsv)
 {
-    int is_active = 0;
     mfxStatus sts = MFX_ERR_NONE;
-
-    is_active = ff_qsv_atomic_dec(&qsv->is_context_active);
+    int is_active = ff_qsv_atomic_dec(&qsv->is_context_active);
 
     // spaces would have to be cleaned on the own,
     // here we care about the rest, common stuff
@@ -241,7 +256,8 @@ void av_qsv_pipe_list_create(av_qsv_list **list, int is_threaded)
 void av_qsv_pipe_list_clean(av_qsv_list **list)
 {
     av_qsv_list *stage;
-    int i = 0;
+    int i;
+
     if (*list) {
         for (i = av_qsv_list_count(*list); i > 0; i--) {
             stage = av_qsv_list_item(*list, i - 1);
@@ -262,7 +278,7 @@ void av_qsv_add_stagee(av_qsv_list **list, av_qsv_stage *stage, int is_threaded)
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
 {
     av_qsv_stage *stage = 0;
-    int size            = 0;
+    int size;
 
 #if HAVE_THREADS
     if (list->mutex)
@@ -283,7 +299,7 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
 
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
 {
-    int i               = 0;
+    int i;
     av_qsv_stage *stage = 0;
 
     for (i = 0; i < av_qsv_list_count(*item); i++) {
@@ -294,13 +310,13 @@ void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
     av_qsv_list_close(item);
 }
 
-av_qsv_stage *av_qsv_get_by_mask(av_qsv_list *list, int mask, av_qsv_stage **prev, av_qsv_list **this_pipe)
+av_qsv_stage *av_qsv_get_by_mask(av_qsv_list *list, int mask,
+                                 av_qsv_stage **prev, av_qsv_list **this_pipe)
 {
-    av_qsv_list *item        = 0;
-    av_qsv_stage *stage      = 0;
-    av_qsv_stage *prev_stage = 0;
-    int i                    = 0;
-    int a                    = 0;
+    av_qsv_list *item = 0;
+    av_qsv_stage *stage = 0, *prev_stage = 0;
+    int i, a;
+
     *this_pipe = 0;
     *prev      = 0;
     for (i = 0; i < av_qsv_list_count(list); i++) {
@@ -324,8 +340,8 @@ av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)
 {
     av_qsv_list *item       = 0;
     av_qsv_stage *cur_stage = 0;
-    int i                   = 0;
-    int a                   = 0;
+    int i, a;
+
     for (i = 0; i < av_qsv_list_count(list); i++) {
         item = av_qsv_list_item(list, i);
         for (a = 0; a < av_qsv_list_count(item); a++) {
@@ -338,11 +354,11 @@ av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)
 }
 
 // no duplicate of the same value, if end == 0 : working over full length
-void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end, int64_t dts, int iter)
+void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
+                               int64_t dts, int iter)
 {
-    av_qsv_dts *cur_dts = 0;
-    av_qsv_dts *new_dts = 0;
-    int i               = 0;
+    av_qsv_dts *cur_dts = 0, *new_dts = 0;
+    int i;
 
 #if HAVE_THREADS
     if (iter == 0 && qsv->qts_seq_mutex)
@@ -400,6 +416,7 @@ void av_qsv_dts_pop(av_qsv_context *qsv)
 av_qsv_list *av_qsv_list_init(int is_threaded)
 {
     av_qsv_list *l = av_mallocz(sizeof(av_qsv_list));
+
     if (!l)
         return 0;
     l->items = av_mallocz_array(AV_QSV_JOB_SIZE_DEFAULT, sizeof(void *));
@@ -433,6 +450,7 @@ int av_qsv_list_count(av_qsv_list *list)
 int av_qsv_list_add(av_qsv_list *l, void *p)
 {
     int pos = -1;
+
     if (!p) {
         return pos;
     }
