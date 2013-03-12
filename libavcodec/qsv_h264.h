@@ -22,20 +22,15 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
-
 #ifndef AVCODEC_QSV_H264_H
 #define AVCODEC_QSV_H264_H
 
-#include <stdint.h>
-#include <sys/types.h>
-#include <mfx/mfxvideo.h>
-
-#include "avcodec.h"
 #include "qsv.h"
+#include <sys/types.h>
+#include "avcodec.h"
 
-int ff_qsv_dec_init(AVCodecContext *);
+int ff_qsv_dec_init(AVCodecContext *avctx);
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size);
 
 av_cold int ff_qsv_decode_init(AVCodecContext * avctx);
@@ -44,7 +39,7 @@ static int qsv_decode_frame(AVCodecContext * avctx, void *data,
                             int *data_size, AVPacket * avpkt);
 static void qsv_flush_dpb(AVCodecContext *avctx);
 
-// Default for SYSTEM MEMORY
+// Default allocators is SYSTEM MEMORY used
 // as from MFXFrameAllocator
 mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,

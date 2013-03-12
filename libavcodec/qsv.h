@@ -101,15 +101,13 @@
  *
  *  Feature set used from MSDK is defined by AV_QSV_MSDK_VERSION_MAJOR and
  *  AV_QSV_MSDK_VERSION_MINOR
- *
  * @{
  */
-
 #include <stdint.h>
 #include <string.h>
 #include <mfx/mfxvideo.h>
-
 #include "libavutil/log.h"
+#include "libavutil/time.h"
 
 // sleep is defined in milliseconds
 #define av_qsv_sleep(x) av_usleep((x) * 1000)
@@ -427,8 +425,6 @@ void av_qsv_pipe_list_clean(av_qsv_list **list);
 void av_qsv_add_stagee(av_qsv_list **list, av_qsv_stage *stage,
                        int is_threaded);
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list);
-av_qsv_stage *av_qsv_get_by_mask(av_qsv_list *list, int mask,
-                                 av_qsv_stage **prev, av_qsv_list **this_pipe);
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage);
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item);
 
