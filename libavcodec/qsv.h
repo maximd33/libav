@@ -125,10 +125,6 @@
     }
 #endif
 
-#ifndef AV_QSV_DEBUG_ASSERT
-#define AV_QSV_DEBUG_ASSERT(x, y) { if ((x)) { av_log(NULL, AV_LOG_FATAL, "\nASSERT: %s\n", y); } }
-#endif
-
 #define AV_QSV_CHECK_RESULT(P, X, ERR)  { if ((X) > (P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
 
 #define AV_QSV_ID_BUFFER MFX_MAKEFOURCC('B', 'U', 'F', 'F')
