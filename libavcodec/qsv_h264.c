@@ -777,7 +777,6 @@ mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
 {
     av_qsv_alloc_buffer *bs;
     mfxU32 header_size;
-    mfxU8 *buffer_ptr;
 
     if (!mid)
         return MFX_ERR_NULL_PTR;
@@ -786,12 +785,11 @@ mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
         return MFX_ERR_UNSUPPORTED;
 
     header_size = AV_QSV_ALIGN32(sizeof(av_qsv_alloc_buffer));
-    buffer_ptr  = av_malloc(header_size + nbytes);
+    bs          = av_malloc(header_size + nbytes);
 
-    if (!buffer_ptr)
+    if (!bs)
         return MFX_ERR_MEMORY_ALLOC;
 
-    bs         = (av_qsv_alloc_buffer *)buffer_ptr;
     bs->id     = AV_QSV_ID_BUFFER;
     bs->type   = type;
     bs->nbytes = nbytes;
