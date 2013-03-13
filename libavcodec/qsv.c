@@ -259,7 +259,7 @@ void av_qsv_pipe_list_clean(av_qsv_list **list)
     }
 }
 
-void av_qsv_add_stagee(av_qsv_list **list, av_qsv_stage *stage, int is_threaded)
+void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage, int is_threaded)
 {
     if (!*list)
         *list = av_qsv_list_init(is_threaded);

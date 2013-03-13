@@ -476,7 +476,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                     pipe = av_qsv_list_init(HAVE_THREADS ?
                                             qsv_config_context->usage_threaded :
                                             HAVE_THREADS);
-                    av_qsv_add_stagee(&pipe, new_stage,
+                    av_qsv_add_stage(&pipe, new_stage,
                                       HAVE_THREADS ?
                                       qsv_config_context->usage_threaded :
                                       HAVE_THREADS);
