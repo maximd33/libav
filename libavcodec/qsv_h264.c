@@ -25,6 +25,7 @@
  */
 
 #include "qsv_h264.h"
+#include "h264.h"
 
 static av_qsv_config av_qsv_default_config = {
     .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,

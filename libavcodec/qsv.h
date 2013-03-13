@@ -248,6 +248,7 @@ typedef struct av_qsv_context {
     /* MediaSDK starting from API version 1.6 includes DecodeTimeStamp
      * in addition to TimeStamp.
      * See also AV_QSV_MSDK_VERSION_MINOR, AV_QSV_MSDK_VERSION_MAJOR.
+     */
     av_qsv_list *dts_seq;
 
     // practically pthread_mutex_t
