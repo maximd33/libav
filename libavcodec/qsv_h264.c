@@ -23,6 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include "qsv_h264.h"
 
 static av_qsv_config av_qsv_default_config = {
@@ -62,8 +63,8 @@ static av_qsv_allocators_space av_qsv_default_system_allocators = {
     },
 };
 
-static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
 static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
+static const uint8_t qsv_slice_code[]  = { 0x00, 0x00, 0x01, 0x65 };
 
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 {
@@ -279,7 +280,7 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
         return AVERROR(ENOMEM);
     }
 
-    qsv->dec_space = qsv_decode;
+    qsv->dec_space   = qsv_decode;
     avctx->priv_data = qsv;
 
     av_qsv_add_context_usage(qsv, HAVE_THREADS ?
@@ -335,7 +336,7 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
 
         av_freep(&qsv->dec_space);
 
-        // closing commong stuff
+        // closing common stuff
         av_qsv_context_clean(qsv);
     }
 
@@ -370,8 +371,8 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
     *got_picture_ptr = 0;
 
-    if (qsv_decode->bs.DataOffset + qsv_decode->bs.DataLength +
-        current_size > qsv_decode->bs.MaxLength) {
+    if (qsv_decode->bs.DataOffset + qsv_decode->bs.DataLength + current_size >
+        qsv_decode->bs.MaxLength) {
         memmove(&qsv_decode->bs.Data[0],
                 qsv_decode->bs.Data + qsv_decode->bs.DataOffset,
                 qsv_decode->bs.DataLength);
@@ -380,11 +381,10 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
     if (current_size) {
         while (current_offset <= current_size) {
-            current_nal_size =
-                (current_position[current_offset - 2] << 24 |
-                 current_position[current_offset - 1] << 16 |
-                 current_position[current_offset] << 8 |
-                 current_position[current_offset + 1]) - 1;
+            current_nal_size = (current_position[current_offset - 2] << 24 |
+                                current_position[current_offset - 1] << 16 |
+                                current_position[current_offset]     <<  8 |
+                                current_position[current_offset + 1]) - 1;
             nal_type = current_position[current_offset + 2] & 0x1F;
 
             frame_length += current_nal_size;
@@ -456,13 +456,12 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             // Decode a frame asynchronously (returns immediately)
             // very first IDR / SLICE should be with SPS/PPS
             sts = MFXVideoDECODE_DecodeFrameAsync(qsv->mfx_session, input_bs,
-                                                  qsv_decode->p_surfaces
-                                                  [surface_idx],
+                                                  qsv_decode->p_surfaces[surface_idx],
                                                   &new_stage->out.p_surface,
-                                                  qsv_decode->p_sync
-                                                  [sync_idx]);
+                                                  qsv_decode->p_sync[sync_idx]);
 
-            if (MFX_ERR_NONE <= sts && MFX_WRN_DEVICE_BUSY != sts &&
+            if (MFX_ERR_NONE                <= sts &&
+                MFX_WRN_DEVICE_BUSY         != sts &&
                 MFX_WRN_VIDEO_PARAM_CHANGED != sts) {
                 new_stage->type         = AV_QSV_DECODE;
                 new_stage->in.p_bs      = input_bs;
@@ -477,9 +476,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                                             qsv_config_context->usage_threaded :
                                             HAVE_THREADS);
                     av_qsv_add_stage(&pipe, new_stage,
-                                      HAVE_THREADS ?
-                                      qsv_config_context->usage_threaded :
-                                      HAVE_THREADS);
+                                     HAVE_THREADS ?
+                                     qsv_config_context->usage_threaded :
+                                     HAVE_THREADS);
 
                     av_qsv_list_add(qsv->pipes, pipe);
                     qsv_atom = pipe;
@@ -667,8 +666,7 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     mfxStatus sts          = MFX_ERR_NONE;
     av_qsv_alloc_frame *fs = 0;
-    mfxU16 width;
-    mfxU16 height;
+    mfxU16 width, height;
 
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
 
@@ -735,7 +733,7 @@ mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     if (MFX_ERR_NONE != sts)
         return sts;
 
-    if (NULL != ptr) {
+    if (ptr) {
         ptr->Pitch = 0;
         ptr->Y     = 0;
         ptr->U     = 0;
@@ -800,6 +798,7 @@ mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
     bs->type   = type;
     bs->nbytes = nbytes;
     *mid       = (mfxHDL)bs;
+
     return MFX_ERR_NONE;
 }
 

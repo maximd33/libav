@@ -23,10 +23,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "qsv.h"
+
 #include "config.h"
 #include "avcodec.h"
 #include "internal.h"
+#include "qsv.h"
 
 #if HAVE_THREADS
 // atomic ops
@@ -57,9 +58,8 @@ int av_qsv_get_free_encode_task(av_qsv_list *tasks)
         for (i = 0; i < av_qsv_list_count(tasks); i++) {
             av_qsv_task *task = av_qsv_list_item(tasks, i);
             if (task->stage && task->stage->out.p_sync)
-                if (!(*task->stage->out.p_sync)) {
+                if (!(*task->stage->out.p_sync))
                     return i;
-                }
         }
     return ret;
 }
@@ -81,7 +81,7 @@ int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
         if (++counter >= AV_QSV_REPEAT_NUM_DEFAULT) {
 #endif
         av_log(NULL, AV_LOG_FATAL,
-               "Have not enough [%d] sync. point(s) allocated\n",
+               "Not enough [%d] sync point(s) allocated.\n",
                space->sync_num);
         break;
 #if HAVE_THREADS
@@ -119,7 +119,7 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
         if (++counter >= AV_QSV_REPEAT_NUM_DEFAULT) {
 #endif
         av_log(NULL, AV_LOG_FATAL,
-               "Have not enough [%d] surface(s) allocated\n", up);
+               "Not enough [%d] surface(s) allocated.\n", up);
         break;
 #if HAVE_THREADS
     }
@@ -143,9 +143,8 @@ int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
         for (b = 0; b < av_qsv_list_count(list); b++) {
             stage = av_qsv_list_item(list, b);
             if (p_surface == stage->out.p_surface ||
-                p_surface == stage->in.p_surface) {
+                p_surface == stage->in.p_surface)
                 return 1;
-            }
         }
     }
     return 0;
@@ -417,9 +416,9 @@ int av_qsv_list_add(av_qsv_list *l, void *p)
 {
     int pos = -1;
 
-    if (!p) {
+    if (!p)
         return pos;
-    }
+
 #if HAVE_THREADS
     if (l->mutex)
         pthread_mutex_lock(l->mutex);
@@ -457,7 +456,7 @@ void av_qsv_list_rem(av_qsv_list *l, void *p)
             memmove(&l->items[i], &l->items[i + 1],
                     (l->items_count - i - 1) * sizeof(void *));
 
-            (l->items_count)--;
+            l->items_count--;
             break;
         }
 
