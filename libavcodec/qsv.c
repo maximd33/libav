@@ -200,7 +200,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 
 #if HAVE_THREADS
         if (is_threaded) {
-            qsv->qts_seq_mutex = av_mallocz(sizeof(*qsv->qts_seq_mutex));
+            qsv->qts_seq_mutex = av_mallocz(sizeof(pthread_mutex_t));
             if (qsv->qts_seq_mutex)
                 pthread_mutex_init(qsv->qts_seq_mutex, NULL);
         } else
@@ -394,7 +394,7 @@ av_qsv_list *av_qsv_list_init(int is_threaded)
 
 #if HAVE_THREADS
     if (is_threaded) {
-        l->mutex = av_mallocz(sizeof(*l->mutex));
+        l->mutex = av_mallocz(sizeof(pthread_mutex_t));
         if (!l->mutex) {
             av_free(l->items);
             av_free(l);
