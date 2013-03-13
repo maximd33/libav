@@ -27,19 +27,13 @@
 #define AVCODEC_QSV_H264_H
 
 #include "qsv.h"
-#include <sys/types.h>
-#include "avcodec.h"
+#include "h264.h"
+#include "h264data.h"
 
 int ff_qsv_dec_init(AVCodecContext *avctx);
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size);
 
-av_cold int ff_qsv_decode_init(AVCodecContext * avctx);
-static int qsv_decode_end(AVCodecContext * avctx);
-static int qsv_decode_frame(AVCodecContext * avctx, void *data,
-                            int *data_size, AVPacket * avpkt);
-static void qsv_flush_dpb(AVCodecContext *avctx);
-
-// Default allocators is SYSTEM MEMORY used
+// Default allocators if SYSTEM MEMORY used
 // as from MFXFrameAllocator
 mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,

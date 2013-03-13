@@ -105,9 +105,12 @@
  */
 #include <stdint.h>
 #include <string.h>
-#include <mfx/mfxvideo.h>
-#include "libavutil/log.h"
+#include "libavutil/mem.h"
 #include "libavutil/time.h"
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif
+#include <mfx/mfxvideo.h>
 
 // sleep is defined in milliseconds
 #define av_qsv_sleep(x) av_usleep((x) * 1000)
