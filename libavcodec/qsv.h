@@ -22,7 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
 #ifndef AVCODEC_QSV_H
@@ -103,20 +102,22 @@
  *  AV_QSV_MSDK_VERSION_MINOR
  * @{
  */
+
 #include <stdint.h>
 #include <string.h>
-#include "libavutil/mem.h"
-#include "libavutil/time.h"
 #if defined(_MSC_VER)
 #include <windows.h>
 #endif
 #include <mfx/mfxvideo.h>
 
+#include "libavutil/mem.h"
+#include "libavutil/time.h"
+
 // sleep is defined in milliseconds
 #define av_qsv_sleep(x) av_usleep((x) * 1000)
 
 #define AV_QSV_ZERO_MEMORY(VAR)     { memset(&VAR, 0, sizeof(VAR)); }
-#define AV_QSV_ALIGN32(X)           (((mfxU32)((X)+31)) & (~(mfxU32)31))
+#define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
 #define AV_QSV_ALIGN16(value)       (((value + 15) >> 4) << 4)
 #ifndef AV_QSV_PRINT_RET_MSG
 #define AV_QSV_PRINT_RET_MSG(ERR)                                       \
@@ -244,9 +245,9 @@ typedef struct av_qsv_context {
 
     av_qsv_list *pipes;
 
-    // MediaSDK starting from API version 1.6 includes DecodeTimeStamp
-    // in addition to TimeStamp
-    // see also AV_QSV_MSDK_VERSION_MINOR , AV_QSV_MSDK_VERSION_MAJOR
+    /* MediaSDK starting from API version 1.6 includes DecodeTimeStamp
+     * in addition to TimeStamp.
+     * See also AV_QSV_MSDK_VERSION_MINOR, AV_QSV_MSDK_VERSION_MAJOR.
     av_qsv_list *dts_seq;
 
     // practically pthread_mutex_t
@@ -423,8 +424,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded);
 void av_qsv_pipe_list_create(av_qsv_list **list, int is_threaded);
 void av_qsv_pipe_list_clean(av_qsv_list **list);
 
-void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage,
-                       int is_threaded);
+void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage, int is_threaded);
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list);
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage);
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item);
@@ -441,12 +441,12 @@ int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv);
 int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv);
 
 av_qsv_list *av_qsv_list_init(int is_threaded);
-int av_qsv_list_count(av_qsv_list *);
-int av_qsv_list_add(av_qsv_list *, void *);
-void av_qsv_list_rem(av_qsv_list *, void *);
-void av_qsv_list_insert(av_qsv_list *, int, void *);
-void *av_qsv_list_item(av_qsv_list *, int);
-void av_qsv_list_close(av_qsv_list **);
+int av_qsv_list_count(av_qsv_list *list);
+int av_qsv_list_add(av_qsv_list *l, void *p);
+void av_qsv_list_rem(av_qsv_list *l, void *p);
+void av_qsv_list_insert(av_qsv_list *l, int pos, void *p);
+void *av_qsv_list_item(av_qsv_list *l, int i);
+void av_qsv_list_close(av_qsv_list **list_close);
 
 /* @} */
 
