@@ -286,7 +286,7 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
     return ff_qsv_dec_init(avctx);
 }
 
-static av_cold int qsv_decode_end(AVCodecContext *avctx)
+static int qsv_decode_end(AVCodecContext *avctx)
 {
     mfxStatus sts                     = MFX_ERR_NONE;
     av_qsv_context *qsv               = avctx->priv_data;
@@ -338,7 +338,7 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-static av_cold int qsv_decode_frame(AVCodecContext *avctx, void *data,
+static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                             int *data_size, AVPacket *avpkt)
 {
     mfxStatus sts                     = MFX_ERR_NONE;
@@ -576,7 +576,7 @@ static av_cold int qsv_decode_frame(AVCodecContext *avctx, void *data,
     return ret_value;
 }
 
-static av_cold void qsv_flush_dpb(AVCodecContext *avctx)
+static void qsv_flush_dpb(AVCodecContext *avctx)
 {
     av_qsv_context *qsv      = avctx->priv_data;
     av_qsv_space *qsv_decode = qsv->dec_space;
