@@ -247,15 +247,15 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
 {
     av_qsv_space *qsv_decode;
     av_qsv_context *qsv;
-    av_qsv_config **qsv_config_context = (av_qsv_config **)&avctx->hwaccel_context;
+    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
 
-    if (!(*qsv_config_context)) {
+    if (!qsv_config_context) {
         av_log(avctx, AV_LOG_INFO,
                "Using default config for QSV decode\n");
-        avctx->hwaccel_context = &av_qsv_default_config;
+        avctx->hwaccel_context = qsv_config_context = &av_qsv_default_config;
     } else {
-        if ((*qsv_config_context)->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
-            (*qsv_config_context)->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+        if (qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
+            qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
             av_log_missing_feature(avctx, "MFX_IOPATTERN_OUT_SYSTEM_MEMORY type", 0);
             return AVERROR_PATCHWELCOME;
         }
@@ -284,7 +284,7 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
     avctx->priv_data = qsv;
 
     av_qsv_add_context_usage(qsv, HAVE_THREADS ?
-                             (*qsv_config_context)->usage_threaded :
+                             qsv_config_context->usage_threaded :
                              HAVE_THREADS);
 
     // allocation of p_sync and p_surfaces inside of ff_qsv_dec_init
