@@ -160,7 +160,7 @@ typedef enum AV_QSV_STAGE_TYPE {
     // "User Modules" etc
     AV_QSV_VPP_USER = 0x020,
 
-#define av_QSV_ENCODE_MASK   0x100
+#define AV_QSV_ENCODE_MASK   0x100
     AV_QSV_ENCODE = 0x100
 #define AV_QSV_ANY_MASK      0xFFF
 } AV_QSV_STAGE_TYPE;
