@@ -286,7 +286,7 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
     return ff_qsv_dec_init(avctx);
 }
 
-static int qsv_decode_end(AVCodecContext *avctx)
+static av_cold int qsv_decode_end(AVCodecContext *avctx)
 {
     mfxStatus sts                     = MFX_ERR_NONE;
     av_qsv_context *qsv               = avctx->priv_data;
