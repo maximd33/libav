@@ -200,7 +200,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 
 #if HAVE_THREADS
         if (is_threaded) {
-            qsv->qts_seq_mutex = av_mallocz(sizeof(pthread_mutex_t));
+            qsv->qts_seq_mutex = av_mallocz(sizeof(*qsv->qts_seq_mutex));
             if (qsv->qts_seq_mutex)
                 pthread_mutex_init(qsv->qts_seq_mutex, NULL);
         } else
@@ -222,13 +222,10 @@ int av_qsv_context_clean(av_qsv_context *qsv)
             av_qsv_list_close(&qsv->dts_seq);
         }
 #if HAVE_THREADS
-        if (qsv->qts_seq_mutex) {
+        if (qsv->qts_seq_mutex)
             pthread_mutex_destroy(qsv->qts_seq_mutex);
 #endif
         qsv->qts_seq_mutex = 0;
-#if HAVE_THREADS
-    }
-#endif
 
         if (qsv->pipes)
             av_qsv_pipe_list_clean(&qsv->pipes);
@@ -338,7 +335,7 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
         end = av_qsv_list_count(qsv->dts_seq);
 
     if (end <= start) {
-        new_dts = av_mallocz(sizeof(av_qsv_dts));
+        new_dts = av_mallocz(sizeof(*new_dts));
         if (new_dts) {
             new_dts->dts = dts;
             av_qsv_list_add(qsv->dts_seq, new_dts);
@@ -347,7 +344,7 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
         for (i = end; i > start; i--) {
             cur_dts = av_qsv_list_item(qsv->dts_seq, i - 1);
             if (cur_dts->dts < dts) {
-                new_dts = av_mallocz(sizeof(av_qsv_dts));
+                new_dts = av_mallocz(sizeof(*new_dts));
                 if (new_dts) {
                     new_dts->dts = dts;
                     av_qsv_list_insert(qsv->dts_seq, i, new_dts);
@@ -384,11 +381,11 @@ void av_qsv_dts_pop(av_qsv_context *qsv)
 
 av_qsv_list *av_qsv_list_init(int is_threaded)
 {
-    av_qsv_list *l = av_mallocz(sizeof(av_qsv_list));
+    av_qsv_list *l = av_mallocz(sizeof(*l));
 
     if (!l)
         return NULL;
-    l->items = av_mallocz_array(AV_QSV_JOB_SIZE_DEFAULT, sizeof(void *));
+    l->items = av_mallocz_array(AV_QSV_JOB_SIZE_DEFAULT, sizeof(*l->items));
     if (!l->items) {
         av_free(l);
         return NULL;
@@ -397,7 +394,7 @@ av_qsv_list *av_qsv_list_init(int is_threaded)
 
 #if HAVE_THREADS
     if (is_threaded) {
-        l->mutex = av_mallocz(sizeof(pthread_mutex_t));
+        l->mutex = av_mallocz(sizeof(*l->mutex));
         if (!l->mutex) {
             av_free(l->items);
             av_free(l);
