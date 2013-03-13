@@ -411,8 +411,6 @@ typedef struct av_qsv_config {
     av_qsv_allocators_space *allocators;
 } av_qsv_config;
 
-static const uint8_t ff_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
-
 int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv);
 int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
                             mfxFrameInfo *info, av_qsv_split part);
