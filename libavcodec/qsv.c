@@ -132,8 +132,8 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
 int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
 {
     int a, b;
-    av_qsv_list *list   = 0;
-    av_qsv_stage *stage = 0;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
 
     if (!p_surface || !qsv->pipes)
         return 0;
@@ -153,8 +153,8 @@ int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
 int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
 {
     int a, b;
-    av_qsv_list *list   = 0;
-    av_qsv_stage *stage = 0;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
 
     if (!sync || !qsv->pipes)
         return 0;
@@ -181,7 +181,7 @@ void av_qsv_stage_clean(av_qsv_stage **stage)
     av_qsv_stage *stage_ptr = *stage;
     if (stage_ptr->out.p_sync) {
         *stage_ptr->out.p_sync = 0;
-        stage_ptr->out.p_sync  = 0;
+        stage_ptr->out.p_sync  = NULL;
     }
     av_freep(stage);
 }
@@ -267,7 +267,7 @@ void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage, int is_threaded)
 
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
 {
-    av_qsv_stage *stage = 0;
+    av_qsv_stage *stage;
     int size;
 
 #if HAVE_THREADS
@@ -290,7 +290,7 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
 {
     int i;
-    av_qsv_stage *stage = 0;
+    av_qsv_stage *stage;
 
     for (i = 0; i < av_qsv_list_count(*item); i++) {
         stage = av_qsv_list_item(*item, i);
@@ -302,8 +302,8 @@ void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
 
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)
 {
-    av_qsv_list *item       = 0;
-    av_qsv_stage *cur_stage = 0;
+    av_qsv_list *item;
+    av_qsv_stage *cur_stage;
     int i, a;
 
     for (i = 0; i < av_qsv_list_count(list); i++) {
@@ -321,7 +321,7 @@ av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)
 void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
                                int64_t dts, int iter)
 {
-    av_qsv_dts *cur_dts = 0, *new_dts = 0;
+    av_qsv_dts *cur_dts, *new_dts;
     int i;
 
 #if HAVE_THREADS
@@ -359,7 +359,7 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
 
 void av_qsv_dts_pop(av_qsv_context *qsv)
 {
-    av_qsv_dts *item = 0;
+    av_qsv_dts *item;
 
 #if HAVE_THREADS
     if (qsv && qsv->qts_seq_mutex)
