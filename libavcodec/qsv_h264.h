@@ -27,8 +27,12 @@
 #ifndef AVCODEC_QSV_H264_H
 #define AVCODEC_QSV_H264_H
 
+#include <stdint.h>
+#include <sys/types.h>
+#include <mfx/mfxdefs.h>
+
+#include "avcodec.h"
 #include "qsv.h"
-#include "h264.h"
 
 int ff_qsv_dec_init(AVCodecContext *avctx);
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size);
