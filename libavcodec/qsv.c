@@ -50,6 +50,31 @@
 #define ff_qsv_atomic_dec(ptr) (*(ptr)--)
 #endif
 
+#if HAVE_THREADS
+#define QSV_MUTEX_LOCK(x)                       \
+    if (x)                                      \
+        pthread_mutex_lock(x)
+#define QSV_MUTEX_LOCK_COND(x, cond)            \
+    if ((cond) && (x))                          \
+        pthread_mutex_lock(x)
+#define QSV_MUTEX_UNLOCK(x)                     \
+    if (x)                                      \
+        pthread_mutex_unlock(x)
+#define QSV_MUTEX_UNLOCK_COND(x, cond)          \
+    if ((cond) && (x))                          \
+        pthread_mutex_unlock(x)
+#define QSV_MUTEX_DESTROY(x)                    \
+    if (x)                                      \
+        pthread_mutex_destroy(&(x));
+
+#else
+#define QSV_MUTEX_LOCK(x)
+#define QSV_MUTEX_LOCK_COND(x, cond)
+#define QSV_MUTEX_UNLOCK(x)
+#define QSV_MUTEX_UNLOCK_COND(x, cond)
+#define QSV_MUTEX_DESTROY(x)
+#endif
+
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 {
     int i;
@@ -219,10 +244,7 @@ int av_qsv_context_clean(av_qsv_context *qsv)
 
             av_qsv_list_close(&qsv->dts_seq);
         }
-#if HAVE_THREADS
-        if (qsv->qts_seq_mutex)
-            pthread_mutex_destroy(qsv->qts_seq_mutex);
-#endif
+        QSV_MUTEX_DESTROY(qsv->qts_seq_mutex);
         qsv->qts_seq_mutex = 0;
 
         if (qsv->pipes)
@@ -270,19 +292,13 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     av_qsv_stage *stage;
     int size;
 
-#if HAVE_THREADS
-    if (list->mutex)
-        pthread_mutex_lock(list->mutex);
-#endif
+    QSV_LOCK_MUTEX(list)
 
     size = av_qsv_list_count(list);
     if (size > 0)
         stage = av_qsv_list_item(list, size - 1);
 
-#if HAVE_THREADS
-    if (list->mutex)
-        pthread_mutex_unlock(list->mutex);
-#endif
+    QSV_UNLOCK_MUTEX(list)
 
     return stage;
 }
@@ -324,10 +340,7 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
     av_qsv_dts *cur_dts, *new_dts;
     int i;
 
-#if HAVE_THREADS
-    if (!iter && qsv->qts_seq_mutex)
-        pthread_mutex_lock(qsv->qts_seq_mutex);
-#endif
+    QSV_MUTEX_LOCK_COND(!iter, qsv->qts_seq_mutex);
 
     if (!end)
         end = av_qsv_list_count(qsv->dts_seq);
@@ -351,30 +364,21 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
             } else if (cur_dts->dts == dts)
                 break;
         }
-#if HAVE_THREADS
-    if (!iter && qsv->qts_seq_mutex)
-        pthread_mutex_unlock(qsv->qts_seq_mutex);
-#endif
+    QSV_MUTEX_UNLOCK_COND(!iter, qsv->qts_seq_mutex);
 }
 
 void av_qsv_dts_pop(av_qsv_context *qsv)
 {
     av_qsv_dts *item;
 
-#if HAVE_THREADS
-    if (qsv && qsv->qts_seq_mutex)
-        pthread_mutex_lock(qsv->qts_seq_mutex);
-#endif
+    QSV_MUTEX_LOCK_COND(qsv, qsv->qts_seq_mutex);
 
     if (av_qsv_list_count(qsv->dts_seq)) {
         item = av_qsv_list_item(qsv->dts_seq, 0);
         av_qsv_list_rem(qsv->dts_seq, item);
         av_free(item);
     }
-#if HAVE_THREADS
-    if (qsv && qsv->qts_seq_mutex)
-        pthread_mutex_unlock(qsv->qts_seq_mutex);
-#endif
+    QSV_MUTEX_UNLOCK_COND(qsv, qsv->qts_seq_mutex);
 }
 
 av_qsv_list *av_qsv_list_init(int is_threaded)
@@ -418,10 +422,7 @@ int av_qsv_list_add(av_qsv_list *l, void *p)
     if (!p)
         return -1;
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_lock(l->mutex);
-#endif
+    QSV_MUTEX_LOCK(l->mutex);
     if (l->items_count == l->items_alloc) {
         l->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
         l->items        = av_realloc(l->items, l->items_alloc * sizeof(void *));
@@ -433,10 +434,7 @@ int av_qsv_list_add(av_qsv_list *l, void *p)
     pos                      = l->items_count;
     l->items_count++;
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_unlock(l->mutex);
-#endif
+    QSV_MUTEX_UNLOCK(l->mutex);
 
     return pos;
 }
@@ -445,10 +443,7 @@ void av_qsv_list_rem(av_qsv_list *l, void *p)
 {
     int i;
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_lock(l->mutex);
-#endif
+    QSV_MUTEX_LOCK(l->mutex);
 
     for (i = 0; i < l->items_count; i++)
         if (l->items[i] == p) {
@@ -459,10 +454,7 @@ void av_qsv_list_rem(av_qsv_list *l, void *p)
             break;
         }
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_unlock(l->mutex);
-#endif
+    QSV_MUTEX_UNLOCK(l->mutex);
 }
 
 void *av_qsv_list_item(av_qsv_list *l, int i)
@@ -477,10 +469,7 @@ void av_qsv_list_insert(av_qsv_list *l, int pos, void *p)
 {
     if (!p)
         return;
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_lock(l->mutex);
-#endif
+    QSV_MUTEX_LOCK(l->mutex);
 
     if (l->items_count == l->items_alloc) {
         l->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
@@ -497,20 +486,14 @@ void av_qsv_list_insert(av_qsv_list *l, int pos, void *p)
     l->items[pos] = p;
     l->items_count++;
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_unlock(l->mutex);
-#endif
+    QSV_MUTEX_UNLOCK(l->mutex);
 }
 
 void av_qsv_list_close(av_qsv_list **list_close)
 {
     av_qsv_list *l = *list_close;
 
-#if HAVE_THREADS
-    if (l->mutex)
-        pthread_mutex_destroy(&l->mutex);
-#endif
+    QSV_MUTEX_DESTROY(l->mutex);
 
     av_free(l->items);
     av_free(l);
