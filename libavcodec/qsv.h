@@ -113,9 +113,6 @@
 #include "libavutil/mem.h"
 #include "libavutil/time.h"
 
-// sleep is defined in milliseconds
-#define av_qsv_sleep(x) av_usleep((x) * 1000)
-
 #define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
 #ifndef AV_QSV_PRINT_RET_MSG
 #define AV_QSV_PRINT_RET_MSG(ERR)                                       \

@@ -86,7 +86,7 @@ int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
         break;
 #if HAVE_THREADS
     }
-    av_qsv_sleep(10);
+    av_usleep(10000);
 #endif
     }
     return -1;
@@ -123,7 +123,7 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
         break;
 #if HAVE_THREADS
     }
-    av_qsv_sleep(10);
+    av_usleep(10000);
 #endif
     }
     return -1;

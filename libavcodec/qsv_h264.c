@@ -444,7 +444,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             }
 
             if (sts == MFX_WRN_DEVICE_BUSY)
-                av_qsv_sleep(10);
+                av_usleep(10000);
 
             sync_idx = av_qsv_get_free_sync(qsv_decode, qsv);
             if (sync_idx == -1) {
