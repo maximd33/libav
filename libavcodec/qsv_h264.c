@@ -203,7 +203,10 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     for (i = 0; i < qsv_decode->surface_num; i++) {
         qsv_decode->p_surfaces[i] = av_mallocz(sizeof(*qsv_decode->p_surfaces[i]));
-        AV_QSV_CHECK_POINTER(qsv_decode->p_surfaces[i], AVERROR(ENOMEM));
+        if (!(qsv_decode->p_surfaces[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
         memcpy(&(qsv_decode->p_surfaces[i]->Info),
                &(qsv_decode->request[0].Info),
                sizeof(qsv_decode->p_surfaces[i]->Info));
@@ -219,7 +222,10 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     qsv_decode->sync_num = FFMIN(qsv_decode->surface_num, AV_QSV_SYNC_NUM);
     for (i = 0; i < qsv_decode->sync_num; i++) {
         qsv_decode->p_sync[i] = av_mallocz(sizeof(*qsv_decode->p_sync[i]));
-        AV_QSV_CHECK_POINTER(qsv_decode->p_sync[i], AVERROR(ENOMEM));
+        if (!(qsv_decode->p_sync[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
     }
 
     memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(qsv_decode->ext_opaque_alloc));

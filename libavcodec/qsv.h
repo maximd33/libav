@@ -130,7 +130,6 @@
 #endif
 
 #define AV_QSV_CHECK_RESULT(P, X, ERR)  { if ((X) > (P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
-#define AV_QSV_CHECK_POINTER(P, ERR)    { if (!(P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
 #define AV_QSV_IGNORE_MFX_STS(P, X)     { if ((X) == (P)) { P = MFX_ERR_NONE; } }
 
 #define AV_QSV_ID_BUFFER MFX_MAKEFOURCC('B', 'U', 'F', 'F')
