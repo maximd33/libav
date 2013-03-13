@@ -23,6 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef AVCODEC_QSV_H264_H
 #define AVCODEC_QSV_H264_H
 
@@ -32,8 +33,7 @@
 int ff_qsv_dec_init(AVCodecContext *avctx);
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size);
 
-// Default allocators if SYSTEM MEMORY used
-// as from MFXFrameAllocator
+/* Default allocators if SYSTEM MEMORY is used as from MFXFrameAllocator. */
 mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,
                                  mfxFrameAllocResponse *response);
