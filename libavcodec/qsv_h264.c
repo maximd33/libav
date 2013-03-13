@@ -164,7 +164,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     qsv_decode->bs.DataLength -= sizeof(qsv_slice_code);
     qsv_decode->bs.DataFlag    = MFX_BITSTREAM_COMPLETE_FRAME;
 
-    memset(&qsv_decode->request, 0, sizeof(mfxFrameAllocRequest) * 2);
+    memset(&qsv_decode->request, 0, sizeof(qsv_decode->request) * 2);
     sts = MFXVideoDECODE_QueryIOSurf(qsv->mfx_session,
                                      &qsv_decode->m_mfxVideoParam,
                                      qsv_decode->request);
@@ -206,7 +206,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
         AV_QSV_CHECK_POINTER(qsv_decode->p_surfaces[i], AVERROR(ENOMEM));
         memcpy(&(qsv_decode->p_surfaces[i]->Info),
                &(qsv_decode->request[0].Info),
-               sizeof(mfxFrameInfo));
+               sizeof(qsv_decode->p_surfaces[i]->Info));
 
         if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
             sts = qsv_config_context->allocators->frame_alloc.Lock(qsv_config_context->allocators,
@@ -222,13 +222,13 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
         AV_QSV_CHECK_POINTER(qsv_decode->p_sync[i], AVERROR(ENOMEM));
     }
 
-    memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(mfxExtOpaqueSurfaceAlloc));
+    memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(qsv_decode->ext_opaque_alloc));
 
     if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_OPAQUE_MEMORY) {
         qsv_decode->p_ext_params = (mfxExtBuffer *)&qsv_decode->ext_opaque_alloc;
 
         qsv_decode->ext_opaque_alloc.Header.BufferId = MFX_EXTBUFF_OPAQUE_SURFACE_ALLOCATION;
-        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(mfxExtOpaqueSurfaceAlloc);
+        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(qsv_decode->ext_opaque_alloc.Header.BufferSz);
         qsv_decode->ext_opaque_alloc.Out.Surfaces    = qsv_decode->p_surfaces;
         qsv_decode->ext_opaque_alloc.Out.NumSurface  = qsv_decode->surface_num;
         qsv_decode->ext_opaque_alloc.Out.Type        = qsv_decode->request[0].Type;
