@@ -190,8 +190,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
         qsv_decode->request[0].NumFrameMin       = qsv_decode->surface_num;
         qsv_decode->request[0].NumFrameSuggested = qsv_decode->surface_num;
 
-        qsv_decode->request[0].Type = MFX_MEMTYPE_EXTERNAL_FRAME |
-                                      MFX_MEMTYPE_FROM_DECODE;
+        qsv_decode->request[0].Type  = MFX_MEMTYPE_EXTERNAL_FRAME |
+                                       MFX_MEMTYPE_FROM_DECODE;
         qsv_decode->request[0].Type |= MFX_MEMTYPE_SYSTEM_MEMORY;
 
         qsv_config_context->allocators->frame_alloc.Alloc(qsv_config_context->allocators,
@@ -295,7 +295,7 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
     mfxStatus sts                     = MFX_ERR_NONE;
     av_qsv_context *qsv               = avctx->priv_data;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    int i                             = 0;
+    int i = 0;
 
     if (qsv) {
         av_qsv_space *qsv_decode = qsv->dec_space;
@@ -422,9 +422,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
         sts = MFX_ERR_NONE;
         // ignore warnings, where warnings >0 , and not error codes <0
-        while (MFX_ERR_NONE <= sts ||
+        while (MFX_ERR_NONE         <= sts ||
                MFX_ERR_MORE_SURFACE == sts ||
-               MFX_WRN_DEVICE_BUSY == sts) {
+               MFX_WRN_DEVICE_BUSY  == sts) {
             if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
                 surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
                                                       &qsv_decode->request[0].Info,
@@ -550,8 +550,8 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         picture->pkt_pts = avpkt->pts;
         picture->pts     = avpkt->pts;
 
-        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_FIELD_REPEATED;
-        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_FIELD_TFF;
+        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_TFF;
         picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_PROGRESSIVE);
 
         // since we do not know it yet from MSDK, let's do just a simple way for now
@@ -852,5 +852,5 @@ AVCodec ff_h264_qsv_decoder = {
     .flush        = qsv_flush_dpb,
     .long_name    = NULL_IF_CONFIG_SMALL("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (Intel QSV acceleration)"),
     .pix_fmts     = (const enum PixelFormat[]) { AV_PIX_FMT_QSV_H264,
-        AV_PIX_FMT_NONE },
+                                                 AV_PIX_FMT_NONE },
 };
