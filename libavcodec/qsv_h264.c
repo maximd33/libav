@@ -168,7 +168,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     sts = MFXVideoDECODE_QueryIOSurf(qsv->mfx_session,
                                      &qsv_decode->m_mfxVideoParam,
                                      qsv_decode->request);
-    AV_QSV_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
+    if (sts == MFX_WRN_PARTIAL_ACCELERATION)
+        sts = MFX_ERR_NONE;
     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
