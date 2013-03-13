@@ -361,11 +361,11 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
     int sync_idx = 0;
     int current_nal_size;
     unsigned char nal_type;
-    av_qsv_stage *new_stage = 0;
+    av_qsv_stage *new_stage;
     mfxBitstream *input_bs  = NULL;
     size_t current_offset   = 2;
-    av_qsv_list *qsv_atom   = 0;
-    av_qsv_list *pipe       = 0;
+    av_qsv_list *qsv_atom;
+    av_qsv_list *pipe;
 
     AVFrame *picture = data;
 
@@ -483,7 +483,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                     av_qsv_list_add(qsv->pipes, pipe);
                     qsv_atom = pipe;
                 } else {
-                    qsv_atom = 0;
+                    qsv_atom = NULL;
                 }
 
                 /* Usage for forced decode sync and results, can be avoided if
@@ -497,7 +497,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
                     // no need to wait more -> force off
                     *new_stage->out.p_sync = 0;
-                    new_stage->out.p_sync  = 0;
+                    new_stage->out.p_sync  = NULL;
                 }
 
                 sts = MFX_ERR_NONE;
@@ -665,7 +665,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
 mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     mfxStatus sts          = MFX_ERR_NONE;
-    av_qsv_alloc_frame *fs = 0;
+    av_qsv_alloc_frame *fs;
     mfxU16 width, height;
 
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
