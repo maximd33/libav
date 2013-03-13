@@ -52,7 +52,7 @@
 
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 {
-    int i, ret = MFX_ERR_NOT_FOUND;
+    int i;
 
     if (tasks)
         for (i = 0; i < av_qsv_list_count(tasks); i++) {
@@ -61,12 +61,12 @@ int av_qsv_get_free_encode_task(av_qsv_list *tasks)
                 if (!(*task->stage->out.p_sync))
                     return i;
         }
-    return ret;
+    return MFX_ERR_NOT_FOUND;
 }
 
 int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
 {
-    int ret = -1, i, counter = 0;
+    int i, counter = 0;
 
     while (1) {
         for (i = 0; i < space->sync_num; i++)
@@ -89,13 +89,13 @@ int av_qsv_get_free_sync(av_qsv_space *space, av_qsv_context *qsv)
     av_qsv_sleep(10);
 #endif
     }
-    return ret;
+    return -1;
 }
 
 int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
                             mfxFrameInfo *info, av_qsv_split part)
 {
-    int ret = -1, i, from, up, counter = 0;
+    int i, from, up, counter = 0;
 
     while (1) {
         from = 0;
@@ -126,7 +126,7 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
     av_qsv_sleep(10);
 #endif
     }
-    return ret;
+    return -1;
 }
 
 int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
@@ -152,13 +152,12 @@ int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
 
 int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
 {
-    int ret = 0;
     int a, b;
     av_qsv_list *list   = 0;
     av_qsv_stage *stage = 0;
 
     if (!sync || !qsv->pipes)
-        return ret;
+        return 0;
 
     for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
         list = av_qsv_list_item(qsv->pipes, a);
@@ -169,7 +168,7 @@ int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
             }
         }
     }
-    return ret;
+    return 0;
 }
 
 av_qsv_stage *av_qsv_stage_init(void)
@@ -414,10 +413,10 @@ int av_qsv_list_count(av_qsv_list *list)
 
 int av_qsv_list_add(av_qsv_list *l, void *p)
 {
-    int pos = -1;
+    int pos;
 
     if (!p)
-        return pos;
+        return -1;
 
 #if HAVE_THREADS
     if (l->mutex)
@@ -427,7 +426,7 @@ int av_qsv_list_add(av_qsv_list *l, void *p)
         l->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
         l->items        = av_realloc(l->items, l->items_alloc * sizeof(void *));
         if (!l->items)
-            return pos;
+            return -1;
     }
 
     l->items[l->items_count] = p;
