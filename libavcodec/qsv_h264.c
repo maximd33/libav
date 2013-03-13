@@ -62,7 +62,7 @@ static av_qsv_allocators_space av_qsv_default_system_allocators = {
     },
 };
 
-static const uint8_t ff_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
+static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
 
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 {
@@ -129,8 +129,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
                     /* fix of MFXVideoDECODE_DecodeHeader: needs one SLICE
                      * to find, any SLICE */
                     memcpy(&qsv_decode->p_buf[header_size + current_nal_size],
-                           ff_slice_code, current_nal_size);
-                    header_size += sizeof(ff_slice_code);
+                           qsv_slice_code, current_nal_size);
+                    header_size += sizeof(qsv_slice_code);
                 }
             }
 
@@ -140,9 +140,9 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     } else {
         memcpy(&qsv_decode->p_buf[0], avctx->extradata, avctx->extradata_size);
         header_size = avctx->extradata_size;
-        memcpy(&qsv_decode->p_buf[header_size], ff_slice_code,
-               sizeof(ff_slice_code));
-        header_size += sizeof(ff_slice_code);
+        memcpy(&qsv_decode->p_buf[header_size], qsv_slice_code,
+               sizeof(qsv_slice_code));
+        header_size += sizeof(qsv_slice_code);
     }
 
     qsv_decode->bs.Data       = qsv_decode->p_buf;
@@ -158,7 +158,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
                                       &qsv_decode->m_mfxVideoParam);
     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
-    qsv_decode->bs.DataLength -= sizeof(ff_slice_code);
+    qsv_decode->bs.DataLength -= sizeof(qsv_slice_code);
     qsv_decode->bs.DataFlag    = MFX_BITSTREAM_COMPLETE_FRAME;
 
     memset(&qsv_decode->request, 0, sizeof(mfxFrameAllocRequest) * 2);
@@ -199,7 +199,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     }
 
     for (i = 0; i < qsv_decode->surface_num; i++) {
-        qsv_decode->p_surfaces[i] = av_mallocz(sizeof(mfxFrameSurface1));
+        qsv_decode->p_surfaces[i] = av_mallocz(sizeof(*qsv_decode->p_surfaces[i]));
         AV_QSV_CHECK_POINTER(qsv_decode->p_surfaces[i], AVERROR(ENOMEM));
         memcpy(&(qsv_decode->p_surfaces[i]->Info),
                &(qsv_decode->request[0].Info),
@@ -215,7 +215,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     qsv_decode->sync_num = FFMIN(qsv_decode->surface_num, AV_QSV_SYNC_NUM);
     for (i = 0; i < qsv_decode->sync_num; i++) {
-        qsv_decode->p_sync[i] = av_mallocz(sizeof(mfxSyncPoint));
+        qsv_decode->p_sync[i] = av_mallocz(sizeof(*qsv_decode->p_sync[i]));
         AV_QSV_CHECK_POINTER(qsv_decode->p_sync[i], AVERROR(ENOMEM));
     }
 
@@ -243,16 +243,15 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
 static av_cold int qsv_decode_init(AVCodecContext *avctx)
 {
-    av_qsv_context *qsv;
     av_qsv_space *qsv_decode;
-    av_qsv_config **qsv_config_context = &avctx->hwaccel_context;
+    av_qsv_config **qsv_config_context = (av_qsv_config **)&avctx->hwaccel_context;
 
-    qsv = av_mallocz(sizeof(av_qsv_context));
+    av_qsv_context *qsv = av_mallocz(sizeof(*qsv));
     if (!qsv)
         return AVERROR(ENOMEM);
     avctx->priv_data = qsv;
 
-    qsv_decode = av_mallocz(sizeof(av_qsv_space));
+    qsv_decode = av_mallocz(sizeof(*qsv_decode));
     if (!qsv_decode)
         return AVERROR(ENOMEM);
     qsv->dec_space = qsv_decode;
@@ -623,7 +622,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
     }
 
     this_alloc->space->mids = av_malloc_array(request->NumFrameSuggested,
-                                              sizeof(mfxMemId));
+                                              sizeof(*this_alloc->space->mids));
     if (!this_alloc->space->mids)
         return MFX_ERR_MEMORY_ALLOC;
 
