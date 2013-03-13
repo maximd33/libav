@@ -293,10 +293,10 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
 
 static av_cold int qsv_decode_end(AVCodecContext *avctx)
 {
-    mfxStatus sts                     = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_context *qsv               = avctx->priv_data;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    int i = 0;
+    int i;
 
     if (qsv) {
         av_qsv_space *qsv_decode = qsv->dec_space;
@@ -664,7 +664,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
 
 mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
-    mfxStatus sts          = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_alloc_frame *fs;
     mfxU16 width, height;
 
@@ -725,10 +725,8 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 
 mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
-    mfxStatus sts                       = MFX_ERR_NONE;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
-
-    sts = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
+    mfxStatus sts = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
 
     if (MFX_ERR_NONE != sts)
         return sts;

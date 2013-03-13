@@ -520,7 +520,7 @@ void av_qsv_list_close(av_qsv_list **list_close)
 
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver)
 {
-    mfxStatus sts = MFX_ERR_NONE;
+    mfxStatus sts;
     mfxSession mfx_session = { 0 };
 
     sts = MFXInit(impl, ver, &mfx_session);
