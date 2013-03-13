@@ -110,8 +110,7 @@
 #endif
 #include <mfx/mfxvideo.h>
 
-#include "libavutil/mem.h"
-#include "libavutil/time.h"
+#include "libavutil/log.h"
 
 #define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
 #ifndef AV_QSV_PRINT_RET_MSG
