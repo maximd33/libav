@@ -24,8 +24,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "qsv_h264.h"
-#include "h264.h"
-#include "h264data.h"
 
 static av_qsv_config av_qsv_default_config = {
     .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,
@@ -243,7 +241,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     return ret;
 }
 
-av_cold int ff_qsv_decode_init(AVCodecContext *avctx)
+static av_cold int qsv_decode_init(AVCodecContext *avctx)
 {
     av_qsv_context *qsv;
     av_qsv_space *qsv_decode;
@@ -288,7 +286,7 @@ av_cold int ff_qsv_decode_init(AVCodecContext *avctx)
     return ff_qsv_dec_init(avctx);
 }
 
-static int qsv_decode_end(AVCodecContext *avctx)
+static av_cold int qsv_decode_end(AVCodecContext *avctx)
 {
     mfxStatus sts                     = MFX_ERR_NONE;
     av_qsv_context *qsv               = avctx->priv_data;
@@ -340,7 +338,7 @@ static int qsv_decode_end(AVCodecContext *avctx)
     return 0;
 }
 
-static int qsv_decode_frame(AVCodecContext *avctx, void *data,
+static av_cold int qsv_decode_frame(AVCodecContext *avctx, void *data,
                             int *data_size, AVPacket *avpkt)
 {
     mfxStatus sts                     = MFX_ERR_NONE;
@@ -578,8 +576,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
     return ret_value;
 }
 
-// Will be called when seeking
-static void qsv_flush_dpb(AVCodecContext *avctx)
+static av_cold void qsv_flush_dpb(AVCodecContext *avctx)
 {
     av_qsv_context *qsv      = avctx->priv_data;
     av_qsv_space *qsv_decode = qsv->dec_space;
@@ -753,7 +750,7 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 {
     mfxStatus sts                       = MFX_ERR_NONE;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
-    mfxU32 i;
+    int i;
 
     if (!response)
         return MFX_ERR_NULL_PTR;
@@ -844,7 +841,7 @@ AVCodec ff_h264_qsv_decoder = {
     .name         = "h264_qsv",
     .type         = AVMEDIA_TYPE_VIDEO,
     .id           = AV_CODEC_ID_H264,
-    .init         = ff_qsv_decode_init,
+    .init         = qsv_decode_init,
     .close        = qsv_decode_end,
     .decode       = qsv_decode_frame,
     .capabilities = CODEC_CAP_DELAY,

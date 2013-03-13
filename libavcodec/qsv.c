@@ -23,10 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "avcodec.h"
-#include "internal.h"
 #include "qsv.h"
 #include "config.h"
+#include "avcodec.h"
+#include "internal.h"
 
 #if HAVE_THREADS
 // atomic ops
