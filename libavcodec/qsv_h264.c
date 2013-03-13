@@ -244,26 +244,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 static av_cold int qsv_decode_init(AVCodecContext *avctx)
 {
     av_qsv_space *qsv_decode;
+    av_qsv_context *qsv;
     av_qsv_config **qsv_config_context = (av_qsv_config **)&avctx->hwaccel_context;
-
-    av_qsv_context *qsv = av_mallocz(sizeof(*qsv));
-    if (!qsv)
-        return AVERROR(ENOMEM);
-    avctx->priv_data = qsv;
-
-    qsv_decode = av_mallocz(sizeof(*qsv_decode));
-    if (!qsv_decode)
-        return AVERROR(ENOMEM);
-    qsv->dec_space = qsv_decode;
-
-    if (qsv_decode->is_init_done)
-        return 0;
-
-    qsv_decode->p_buf_max_size = AV_QSV_BUF_SIZE_DEFAULT;
-    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size,
-                                                 sizeof(uint8_t));
-    if (!qsv_decode->p_buf)
-        return AVERROR(ENOMEM);
 
     if (!(*qsv_config_context)) {
         av_log(avctx, AV_LOG_INFO,
@@ -276,6 +258,28 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
             return AVERROR_PATCHWELCOME;
         }
     }
+
+    qsv = av_mallocz(sizeof(*qsv));
+    if (!qsv)
+        return AVERROR(ENOMEM);
+
+    qsv_decode = av_mallocz(sizeof(*qsv_decode));
+    if (!qsv_decode) {
+        av_free(qsv);
+        return AVERROR(ENOMEM);
+    }
+
+    qsv_decode->p_buf_max_size = AV_QSV_BUF_SIZE_DEFAULT;
+    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size,
+                                                 sizeof(uint8_t));
+    if (!qsv_decode->p_buf) {
+        av_free(qsv_decode);
+        av_free(qsv);
+        return AVERROR(ENOMEM);
+    }
+
+    qsv->dec_space = qsv_decode;
+    avctx->priv_data = qsv;
 
     av_qsv_add_context_usage(qsv, HAVE_THREADS ?
                              (*qsv_config_context)->usage_threaded :
