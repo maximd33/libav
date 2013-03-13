@@ -441,12 +441,12 @@ int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv);
 int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv);
 
 av_qsv_list *av_qsv_list_init(int is_threaded);
-int av_qsv_list_count(av_qsv_list *);
-int av_qsv_list_add(av_qsv_list *, void *);
-void av_qsv_list_rem(av_qsv_list *, void *);
-void av_qsv_list_insert(av_qsv_list *, int, void *);
-void *av_qsv_list_item(av_qsv_list *, int);
-void av_qsv_list_close(av_qsv_list **);
+int av_qsv_list_count(av_qsv_list *list);
+int av_qsv_list_add(av_qsv_list *l, void *p);
+void av_qsv_list_rem(av_qsv_list *l, void *p);
+void av_qsv_list_insert(av_qsv_list *l, int pos, void *p);
+void *av_qsv_list_item(av_qsv_list *l, int i);
+void av_qsv_list_close(av_qsv_list **list_close);
 
 /* @} */
 
