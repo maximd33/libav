@@ -99,7 +99,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     qsv->impl = qsv_config_context->impl_requested;
 
-    AV_QSV_ZERO_MEMORY(qsv->mfx_session);
+    memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
     qsv->ver.Major = AV_QSV_MSDK_VERSION_MAJOR;
     qsv->ver.Minor = AV_QSV_MSDK_VERSION_MINOR;
 

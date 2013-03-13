@@ -191,7 +191,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
     int is_active = ff_qsv_atomic_inc(&qsv->is_context_active);
 
     if (is_active == 1) {
-        AV_QSV_ZERO_MEMORY(qsv->mfx_session);
+        memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
         av_qsv_pipe_list_create(&qsv->pipes, is_threaded);
 
         qsv->dts_seq = av_qsv_list_init(is_threaded);
