@@ -87,8 +87,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 {
     mfxStatus sts         = MFX_ERR_NONE;
     size_t current_offset = 6;
-    int header_size       = 0;
-    int i                 = 0;
+    int i, header_size    = 0;
     unsigned char *current_position;
     size_t current_size;
 
