@@ -85,7 +85,6 @@ int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 
 int ff_qsv_dec_init(AVCodecContext *avctx)
 {
-    int ret               = 0;
     mfxStatus sts         = MFX_ERR_NONE;
     size_t current_offset = 6;
     int header_size       = 0;
@@ -248,7 +247,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     qsv_decode->is_init_done = 1;
-    return ret;
+    return 0;
 }
 
 static av_cold int qsv_decode_init(AVCodecContext *avctx)
