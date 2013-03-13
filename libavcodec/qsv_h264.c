@@ -63,6 +63,7 @@ static av_qsv_allocators_space av_qsv_default_system_allocators = {
 };
 
 static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
+static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
 
 int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 {
@@ -117,9 +118,9 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
             unsigned char nal_type = current_position[current_offset + 2] & 0x1F;
 
             if (nal_type == NAL_SPS || nal_type == NAL_PPS) {
-                memcpy(&qsv_decode->p_buf[header_size], ff_prefix_code,
-                       sizeof(ff_prefix_code));
-                header_size += sizeof(ff_prefix_code);
+                memcpy(&qsv_decode->p_buf[header_size], qsv_prefix_code,
+                       sizeof(qsv_prefix_code));
+                header_size += sizeof(qsv_prefix_code);
                 memcpy(&qsv_decode->p_buf[header_size],
                        &current_position[current_offset + 2],
                        current_nal_size);
@@ -390,9 +391,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
             memcpy(&qsv_decode->bs.Data[0] +
                    qsv_decode->bs.DataLength +
-                   qsv_decode->bs.DataOffset, ff_prefix_code,
-                   sizeof(ff_prefix_code));
-            qsv_decode->bs.DataLength += sizeof(ff_prefix_code);
+                   qsv_decode->bs.DataOffset, qsv_prefix_code,
+                   sizeof(qsv_prefix_code));
+            qsv_decode->bs.DataLength += sizeof(qsv_prefix_code);
             memcpy(&qsv_decode->bs.Data[0] +
                    qsv_decode->bs.DataLength +
                    qsv_decode->bs.DataOffset,
