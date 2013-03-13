@@ -521,9 +521,8 @@ void av_qsv_list_close(av_qsv_list **list_close)
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver)
 {
     mfxStatus sts = MFX_ERR_NONE;
-    mfxSession mfx_session;
+    mfxSession mfx_session = { 0 };
 
-    AV_QSV_ZERO_MEMORY(mfx_session);
     sts = MFXInit(impl, ver, &mfx_session);
     if (sts >= 0)
         MFXClose(mfx_session);
