@@ -46,8 +46,8 @@
 #include "w32pthreads.h"
 #endif
 #else
-#define ff_qsv_atomic_inc(ptr) ((*ptr)++)
-#define ff_qsv_atomic_dec(ptr) ((*ptr)--)
+#define ff_qsv_atomic_inc(ptr) (*(ptr)++)
+#define ff_qsv_atomic_dec(ptr) (*(ptr)--)
 #endif
 
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)

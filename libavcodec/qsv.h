@@ -127,8 +127,8 @@
 #define AV_QSV_ID_FRAME  MFX_MAKEFOURCC('F', 'R', 'M', 'E')
 
 #define AV_QSV_SURFACE_NUM              80
-#define AV_QSV_SYNC_NUM                 AV_QSV_SURFACE_NUM * 3 / 4
-#define AV_QSV_BUF_SIZE_DEFAULT         4096 * 2160 * 10
+#define AV_QSV_SYNC_NUM                 (AV_QSV_SURFACE_NUM * 3 / 4)
+#define AV_QSV_BUF_SIZE_DEFAULT         (4096 * 2160 * 10)
 #define AV_QSV_JOB_SIZE_DEFAULT         10
 #define AV_QSV_SYNC_TIME_DEFAULT        10000
 // see av_qsv_get_free_sync, av_qsv_get_free_surface , 100 if usleep(10*1000)(10ms) == 1 sec
