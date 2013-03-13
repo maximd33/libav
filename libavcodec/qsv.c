@@ -325,11 +325,11 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
     int i;
 
 #if HAVE_THREADS
-    if (iter == 0 && qsv->qts_seq_mutex)
+    if (!iter && qsv->qts_seq_mutex)
         pthread_mutex_lock(qsv->qts_seq_mutex);
 #endif
 
-    if (end == 0)
+    if (!end)
         end = av_qsv_list_count(qsv->dts_seq);
 
     if (end <= start) {
@@ -352,7 +352,7 @@ void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
                 break;
         }
 #if HAVE_THREADS
-    if (iter == 0 && qsv->qts_seq_mutex)
+    if (!iter && qsv->qts_seq_mutex)
         pthread_mutex_unlock(qsv->qts_seq_mutex);
 #endif
 }

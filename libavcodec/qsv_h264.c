@@ -410,7 +410,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         }
     }
 
-    if (frame_length || current_size == 0) {
+    if (frame_length || !current_size) {
         qsv_decode->bs.TimeStamp = avpkt->pts;
 
         if (qsv_config_context->dts_need) {
@@ -425,7 +425,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         while (MFX_ERR_NONE         <= sts ||
                MFX_ERR_MORE_SURFACE == sts ||
                MFX_WRN_DEVICE_BUSY  == sts) {
-            if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_NONE == sts) {
+            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
                 surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
                                                       &qsv_decode->request[0].Info,
                                                       QSV_PART_ANY);
@@ -435,7 +435,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                 }
             }
 
-            if (MFX_WRN_DEVICE_BUSY == sts)
+            if (sts == MFX_WRN_DEVICE_BUSY)
                 av_qsv_sleep(10);
 
             sync_idx = av_qsv_get_free_sync(qsv_decode, qsv);
@@ -460,9 +460,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                                                   &new_stage->out.p_surface,
                                                   qsv_decode->p_sync[sync_idx]);
 
-            if (MFX_ERR_NONE                <= sts &&
-                MFX_WRN_DEVICE_BUSY         != sts &&
-                MFX_WRN_VIDEO_PARAM_CHANGED != sts) {
+            if (sts <= MFX_ERR_NONE        &&
+                sts != MFX_WRN_DEVICE_BUSY &&
+                sts != MFX_WRN_VIDEO_PARAM_CHANGED) {
                 new_stage->type         = AV_QSV_DECODE;
                 new_stage->in.p_bs      = input_bs;
                 new_stage->in.p_surface = qsv_decode->p_surfaces[surface_idx];
@@ -513,7 +513,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
              * bitstream pointer to drain any remaining frames cached within
              * the Intel Media SDK decoder, until the function returns
              * MFX_ERR_MORE_DATA. */
-            if (MFX_ERR_MORE_DATA == sts) {
+            if (sts == MFX_ERR_MORE_DATA) {
                 // not a drain
                 if (current_size) {
                     *got_picture_ptr = 0;
@@ -523,7 +523,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                 break;
             }
 
-            if (MFX_ERR_MORE_SURFACE == sts || MFX_ERR_MORE_SURFACE == sts)
+            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_MORE_SURFACE)
                 continue;
 
             AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
@@ -537,7 +537,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             *got_picture_ptr = 1;
             ret_value        = avpkt->size;
         } else {
-            if (MFX_ERR_MORE_DATA != sts) {
+            if (sts != MFX_ERR_MORE_DATA) {
                 *got_picture_ptr = 1;
                 ret_value        = avpkt->size;
             } else {
@@ -637,13 +637,13 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                              request->Type,
                                              &this_alloc->space->mids[numAllocated]);
 
-        if (MFX_ERR_NONE != sts)
+        if (sts != MFX_ERR_NONE)
             break;
 
         sts = this_alloc->buffer_alloc.Lock(this_alloc->buffer_alloc.pthis,
                                             this_alloc->space->mids[numAllocated],
                                             (mfxU8 **)&fs);
-        if (MFX_ERR_NONE != sts)
+        if (sts != MFX_ERR_NONE)
             break;
 
         fs->id   = AV_QSV_ID_FRAME;
@@ -677,10 +677,10 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 
     sts = this_alloc->buffer_alloc.Lock(this_alloc->buffer_alloc.pthis, mid, (mfxU8 **)&fs);
 
-    if (MFX_ERR_NONE != sts)
+    if (sts != MFX_ERR_NONE)
         return sts;
 
-    if (AV_QSV_ID_FRAME != fs->id) {
+    if (fs->id != AV_QSV_ID_FRAME) {
         this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
         return MFX_ERR_INVALID_HANDLE;
     }
@@ -728,7 +728,7 @@ mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     mfxStatus sts = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
 
-    if (MFX_ERR_NONE != sts)
+    if (sts != MFX_ERR_NONE)
         return sts;
 
     if (ptr) {
@@ -763,7 +763,7 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
             if (response->mids[i]) {
                 sts = this_alloc->buffer_alloc.Free(this_alloc->buffer_alloc.pthis,
                                                     response->mids[i]);
-                if (MFX_ERR_NONE != sts)
+                if (sts != MFX_ERR_NONE)
                     return sts;
             }
 
@@ -811,7 +811,7 @@ mfxStatus ff_qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr)
 
     if (!bs)
         return MFX_ERR_INVALID_HANDLE;
-    if (AV_QSV_ID_BUFFER != bs->id)
+    if (bs->id != AV_QSV_ID_BUFFER)
         return MFX_ERR_INVALID_HANDLE;
 
     *ptr = (mfxU8 *)bs + AV_QSV_ALIGN32(sizeof(av_qsv_alloc_buffer));
@@ -822,7 +822,7 @@ mfxStatus ff_qsv_mem_buffer_unlock(mfxHDL pthis, mfxMemId mid)
 {
     av_qsv_alloc_buffer *bs = (av_qsv_alloc_buffer *)mid;
 
-    if (!bs || AV_QSV_ID_BUFFER != bs->id)
+    if (!bs || bs->id != AV_QSV_ID_BUFFER)
         return MFX_ERR_INVALID_HANDLE;
 
     return MFX_ERR_NONE;
