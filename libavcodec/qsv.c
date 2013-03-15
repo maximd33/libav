@@ -248,7 +248,7 @@ int av_qsv_context_clean(av_qsv_context *qsv)
         qsv->qts_seq_mutex = 0;
 
         if (qsv->pipes)
-            av_qsv_pipe_list_clean(&qsv->pipes);
+            av_qsv_pipe_list_clean(qsv->pipes);
 
         if (qsv->mfx_session) {
             sts = MFXClose(qsv->mfx_session);
@@ -265,17 +265,17 @@ void av_qsv_pipe_list_create(av_qsv_list *list, int is_threaded)
         list = av_qsv_list_init(is_threaded);
 }
 
-void av_qsv_pipe_list_clean(av_qsv_list **list)
+void av_qsv_pipe_list_clean(av_qsv_list *list)
 {
     av_qsv_list *stage;
     int i;
 
-    if (*list) {
-        for (i = av_qsv_list_count(*list); i > 0; i--) {
-            stage = av_qsv_list_item(*list, i - 1);
-            av_qsv_flush_stages(*list, &stage);
+    if (list) {
+        for (i = av_qsv_list_count(list); i > 0; i--) {
+            stage = av_qsv_list_item(list, i - 1);
+            av_qsv_flush_stages(list, &stage);
         }
-        av_qsv_list_close(*list);
+        av_qsv_list_close(list);
     }
 }
 
