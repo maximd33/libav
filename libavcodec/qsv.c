@@ -203,10 +203,10 @@ av_qsv_stage *av_qsv_stage_init(void)
 
 void av_qsv_stage_clean(av_qsv_stage **stage)
 {
-    av_qsv_stage *stage_ptr = *stage;
-    if (stage_ptr->out.p_sync) {
-        *stage_ptr->out.p_sync = 0;
-        stage_ptr->out.p_sync  = NULL;
+    mfxSyncPoint *p_sync = (*stage)->out.p_sync;
+    if (p_sync) {
+        *p_sync = 0;
+        p_sync  = NULL;
     }
     av_freep(stage);
 }
