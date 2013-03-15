@@ -413,7 +413,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded);
 void av_qsv_pipe_list_create(av_qsv_list *list, int is_threaded);
 void av_qsv_pipe_list_clean(av_qsv_list *list);
 
-void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage, int is_threaded);
+void av_qsv_add_stage(av_qsv_list *list, av_qsv_stage *stage, int is_threaded);
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list);
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage);
 void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item);
