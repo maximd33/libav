@@ -440,7 +440,7 @@ int av_qsv_list_add(av_qsv_list *list, void *elem)
     return pos;
 }
 
-void av_qsv_list_del(av_qsv_list *list, void *elem)
+void av_qsv_list_rem(av_qsv_list *list, void *elem)
 {
     int i;
 
@@ -448,7 +448,7 @@ void av_qsv_list_del(av_qsv_list *list, void *elem)
 
     for (i = 0; i < list->items_count; i++)
         if (list->items[i] == elem) {
-            memmove(&list->items[i], &l->items[i + 1],
+            memmove(&list->items[i], &list->items[i + 1],
                     (list->items_count - i - 1) * sizeof(void *));
 
             list->items_count--;
@@ -492,14 +492,14 @@ void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem)
 
 void av_qsv_list_close(av_qsv_list **list)
 {
-    av_qsv_list *l = *list_close;
+    av_qsv_list *l = *list;
 
     QSV_MUTEX_DESTROY(l->mutex);
 
     av_free(l->items);
     av_free(l);
 
-    *list_close = NULL;
+    *list = NULL;
 }
 
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver)
