@@ -273,7 +273,7 @@ void av_qsv_pipe_list_clean(av_qsv_list *list)
     if (list) {
         for (i = av_qsv_list_count(list); i > 0; i--) {
             stage = av_qsv_list_item(list, i - 1);
-            av_qsv_flush_stages(list, &stage);
+            av_qsv_flush_stages(list, stage);
         }
         av_qsv_list_close(list);
     }
@@ -303,17 +303,17 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     return stage;
 }
 
-void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
+void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list *item)
 {
     int i;
     av_qsv_stage *stage;
 
-    for (i = 0; i < av_qsv_list_count(*item); i++) {
-        stage = av_qsv_list_item(*item, i);
+    for (i = 0; i < av_qsv_list_count(item); i++) {
+        stage = av_qsv_list_item(item, i);
         av_qsv_stage_clean(&stage);
     }
-    av_qsv_list_rem(list, *item);
-    av_qsv_list_close(*item);
+    av_qsv_list_rem(list, item);
+    av_qsv_list_close(item);
 }
 
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)

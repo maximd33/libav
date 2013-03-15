@@ -85,7 +85,7 @@
  *  Resources re-usage (av_qsv_flush_stages), if resource_free || usage_threaded option:
  *     av_qsv_context *qsv = (av_qsv_context *)video_codec_ctx->priv_data;
  *     av_qsv_list *pipe = (av_qsv_list *)video_frame->data[2];
- *     av_qsv_flush_stages( qsv->pipes, &pipe );
+ *     av_qsv_flush_stages(qsv->pipes, pipe);
  *
  *  DTS re-usage, if dts_need option:
  *     av_qsv_dts_pop(qsv);
@@ -416,7 +416,7 @@ void av_qsv_pipe_list_clean(av_qsv_list *list);
 void av_qsv_add_stage(av_qsv_list *list, av_qsv_stage *stage, int is_threaded);
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list);
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage);
-void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item);
+void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list *item);
 
 void av_qsv_dts_ordered_insert(av_qsv_context *qsv, int start, int end,
                                int64_t dts, int iter);
