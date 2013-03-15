@@ -217,7 +217,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 
     if (is_active == 1) {
         memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
-        av_qsv_pipe_list_create(&qsv->pipes, is_threaded);
+        av_qsv_pipe_list_create(qsv->pipes, is_threaded);
 
         qsv->dts_seq = av_qsv_list_init(is_threaded);
 
@@ -259,10 +259,10 @@ int av_qsv_context_clean(av_qsv_context *qsv)
     return 0;
 }
 
-void av_qsv_pipe_list_create(av_qsv_list **list, int is_threaded)
+void av_qsv_pipe_list_create(av_qsv_list *list, int is_threaded)
 {
-    if (!*list)
-        *list = av_qsv_list_init(is_threaded);
+    if (!list)
+        list = av_qsv_list_init(is_threaded);
 }
 
 void av_qsv_pipe_list_clean(av_qsv_list **list)
