@@ -203,10 +203,10 @@ av_qsv_stage *av_qsv_stage_init(void)
 
 void av_qsv_stage_clean(av_qsv_stage **stage)
 {
-    av_qsv_stage *stage_ptr = *stage;
-    if (stage_ptr->out.p_sync) {
-        *stage_ptr->out.p_sync = 0;
-        stage_ptr->out.p_sync  = NULL;
+    mfxSyncPoint *p_sync = (*stage)->out.p_sync;
+    if (p_sync) {
+        *p_sync = 0;
+        p_sync  = NULL;
     }
     av_freep(stage);
 }
@@ -217,7 +217,7 @@ void av_qsv_add_context_usage(av_qsv_context *qsv, int is_threaded)
 
     if (is_active == 1) {
         memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
-        av_qsv_pipe_list_create(&qsv->pipes, is_threaded);
+        av_qsv_pipe_list_create(qsv->pipes, is_threaded);
 
         qsv->dts_seq = av_qsv_list_init(is_threaded);
 
@@ -242,13 +242,13 @@ int av_qsv_context_clean(av_qsv_context *qsv)
             while (av_qsv_list_count(qsv->dts_seq))
                 av_qsv_dts_pop(qsv);
 
-            av_qsv_list_close(&qsv->dts_seq);
+            av_qsv_list_close(qsv->dts_seq);
         }
         QSV_MUTEX_DESTROY(qsv->qts_seq_mutex);
         qsv->qts_seq_mutex = 0;
 
         if (qsv->pipes)
-            av_qsv_pipe_list_clean(&qsv->pipes);
+            av_qsv_pipe_list_clean(qsv->pipes);
 
         if (qsv->mfx_session) {
             sts = MFXClose(qsv->mfx_session);
@@ -259,32 +259,32 @@ int av_qsv_context_clean(av_qsv_context *qsv)
     return 0;
 }
 
-void av_qsv_pipe_list_create(av_qsv_list **list, int is_threaded)
+void av_qsv_pipe_list_create(av_qsv_list *list, int is_threaded)
 {
-    if (!*list)
-        *list = av_qsv_list_init(is_threaded);
+    if (!list)
+        list = av_qsv_list_init(is_threaded);
 }
 
-void av_qsv_pipe_list_clean(av_qsv_list **list)
+void av_qsv_pipe_list_clean(av_qsv_list *list)
 {
     av_qsv_list *stage;
     int i;
 
-    if (*list) {
-        for (i = av_qsv_list_count(*list); i > 0; i--) {
-            stage = av_qsv_list_item(*list, i - 1);
-            av_qsv_flush_stages(*list, &stage);
+    if (list) {
+        for (i = av_qsv_list_count(list); i > 0; i--) {
+            stage = av_qsv_list_item(list, i - 1);
+            av_qsv_flush_stages(list, stage);
         }
         av_qsv_list_close(list);
     }
 }
 
-void av_qsv_add_stage(av_qsv_list **list, av_qsv_stage *stage, int is_threaded)
+void av_qsv_add_stage(av_qsv_list *list, av_qsv_stage *stage, int is_threaded)
 {
-    if (!*list)
-        *list = av_qsv_list_init(is_threaded);
-    if (*list)
-        av_qsv_list_add(*list, stage);
+    if (!list)
+        list = av_qsv_list_init(is_threaded);
+    else
+        av_qsv_list_add(list, stage);
 }
 
 av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
@@ -303,16 +303,16 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     return stage;
 }
 
-void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
+void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list *item)
 {
     int i;
-    av_qsv_stage *stage;
+    av_qsv_stage **stage;
 
-    for (i = 0; i < av_qsv_list_count(*item); i++) {
-        stage = av_qsv_list_item(*item, i);
-        av_qsv_stage_clean(&stage);
+    for (i = 0; i < av_qsv_list_count(item); i++) {
+        stage = av_qsv_list_item(item, i);
+        av_qsv_stage_clean(stage);
     }
-    av_qsv_list_rem(list, *item);
+    av_qsv_list_rem(list, item);
     av_qsv_list_close(item);
 }
 
@@ -490,16 +490,12 @@ void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem)
     QSV_MUTEX_UNLOCK(list->mutex);
 }
 
-void av_qsv_list_close(av_qsv_list **list)
+void av_qsv_list_close(av_qsv_list *list)
 {
-    av_qsv_list *l = *list;
-
-    QSV_MUTEX_DESTROY(l->mutex);
-
-    av_free(l->items);
-    av_free(l);
-
-    *list = NULL;
+    QSV_MUTEX_DESTROY(list->mutex);
+    av_free(list->items);
+    av_free(list);
+    list = NULL;
 }
 
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver)
