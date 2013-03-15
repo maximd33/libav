@@ -77,48 +77,6 @@
 #define QSV_MUTEX_DESTROY(x)
 #endif
 
-int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
-{
-    int a, b;
-    av_qsv_list *list;
-    av_qsv_stage *stage;
-
-    if (!p_surface || !qsv->pipes)
-        return 0;
-
-    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
-        list = av_qsv_list_item(qsv->pipes, a);
-        for (b = 0; b < av_qsv_list_count(list); b++) {
-            stage = av_qsv_list_item(list, b);
-            if (p_surface == stage->out.p_surface ||
-                p_surface == stage->in.p_surface)
-                return 1;
-        }
-    }
-    return 0;
-}
-
-int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
-{
-    int a, b;
-    av_qsv_list *list;
-    av_qsv_stage *stage;
-
-    if (!sync || !qsv->pipes)
-        return 0;
-
-    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
-        list = av_qsv_list_item(qsv->pipes, a);
-        for (b = 0; b < av_qsv_list_count(list); b++) {
-            stage = av_qsv_list_item(list, b);
-            if (sync == stage->out.p_sync) {
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 {
     int i;
@@ -196,6 +154,46 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
 #endif
     }
     return -1;
+}
+int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
+{
+    int a, b;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
+
+    if (!p_surface || !qsv->pipes)
+        return 0;
+
+    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
+        list = av_qsv_list_item(qsv->pipes, a);
+        for (b = 0; b < av_qsv_list_count(list); b++) {
+            stage = av_qsv_list_item(list, b);
+            if (p_surface == stage->out.p_surface ||
+                p_surface == stage->in.p_surface)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
+{
+    int a, b;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
+
+    if (!sync || !qsv->pipes)
+        return 0;
+
+    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
+        list = av_qsv_list_item(qsv->pipes, a);
+        for (b = 0; b < av_qsv_list_count(list); b++) {
+            stage = av_qsv_list_item(list, b);
+            if (sync == stage->out.p_sync)
+                return 1;
+        }
+    }
+    return 0;
 }
 
 av_qsv_stage *av_qsv_stage_init(void)
@@ -417,81 +415,82 @@ int av_qsv_list_count(av_qsv_list *list)
     return list->items_count;
 }
 
-int av_qsv_list_add(av_qsv_list *l, void *p)
+int av_qsv_list_add(av_qsv_list *list, void *elem)
 {
     int pos;
 
-    if (!p)
+    if (!elem)
         return -1;
 
-    QSV_MUTEX_LOCK(l->mutex);
-    if (l->items_count == l->items_alloc) {
-        l->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
-        l->items        = av_realloc(l->items, l->items_alloc * sizeof(void *));
-        if (!l->items)
+    QSV_MUTEX_LOCK(list->mutex);
+    if (list->items_count == list->items_alloc) {
+        list->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
+        list->items        = av_realloc(list->items,
+                                        list->items_alloc * sizeof(void *));
+        if (!list->items)
             return -1;
     }
 
-    l->items[l->items_count] = p;
-    pos                      = l->items_count;
-    l->items_count++;
+    list->items[list->items_count] = elem;
+    pos = list->items_count;
+    list->items_count++;
 
-    QSV_MUTEX_UNLOCK(l->mutex);
+    QSV_MUTEX_UNLOCK(list->mutex);
 
     return pos;
 }
 
-void av_qsv_list_rem(av_qsv_list *l, void *p)
+void av_qsv_list_del(av_qsv_list *list, void *elem)
 {
     int i;
 
-    QSV_MUTEX_LOCK(l->mutex);
+    QSV_MUTEX_LOCK(list->mutex);
 
-    for (i = 0; i < l->items_count; i++)
-        if (l->items[i] == p) {
-            memmove(&l->items[i], &l->items[i + 1],
-                    (l->items_count - i - 1) * sizeof(void *));
+    for (i = 0; i < list->items_count; i++)
+        if (list->items[i] == elem) {
+            memmove(&list->items[i], &l->items[i + 1],
+                    (list->items_count - i - 1) * sizeof(void *));
 
-            l->items_count--;
+            list->items_count--;
             break;
         }
 
-    QSV_MUTEX_UNLOCK(l->mutex);
+    QSV_MUTEX_UNLOCK(list->mutex);
 }
 
-void *av_qsv_list_item(av_qsv_list *l, int i)
+void *av_qsv_list_item(av_qsv_list *list, int pos)
 {
-    if (i < 0 || i >= l->items_count)
+    if (pos < 0 || pos >= list->items_count)
         return NULL;
 
-    return l->items[i];
+    return list->items[pos];
 }
 
-void av_qsv_list_insert(av_qsv_list *l, int pos, void *p)
+void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem)
 {
-    if (!p)
+    if (!elem)
         return;
-    QSV_MUTEX_LOCK(l->mutex);
+    QSV_MUTEX_LOCK(list->mutex);
 
-    if (l->items_count == l->items_alloc) {
-        l->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
-        l->items        = av_realloc(l->items, l->items_alloc * sizeof(void *));
-        if (!l->items)
+    if (list->items_count == list->items_alloc) {
+        list->items_alloc += AV_QSV_JOB_SIZE_DEFAULT;
+        list->items        = av_realloc(list->items,
+                                        list->items_alloc * sizeof(void *));
+        if (!list->items)
             return;
     }
 
-    if (l->items_count != pos) {
-        memmove(&l->items[pos + 1], &l->items[pos],
-                (l->items_count - pos) * sizeof(void *));
-    }
+    if (list->items_count != pos)
+        memmove(&list->items[pos + 1], &list->items[pos],
+                (list->items_count - pos) * sizeof(void *));
 
-    l->items[pos] = p;
-    l->items_count++;
+    list->items[pos] = elem;
+    list->items_count++;
 
-    QSV_MUTEX_UNLOCK(l->mutex);
+    QSV_MUTEX_UNLOCK(list->mutex);
 }
 
-void av_qsv_list_close(av_qsv_list **list_close)
+void av_qsv_list_close(av_qsv_list **list)
 {
     av_qsv_list *l = *list_close;
 
