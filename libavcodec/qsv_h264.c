@@ -264,7 +264,9 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
         if (qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
             qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
             avpriv_report_missing_feature(avctx,
-                    "Support of other type than MFX_IOPATTERN_OUT_OPAQUE_MEMORY/MFX_IOPATTERN_OUT_SYSTEM_MEMORY");
+                                          "Memory type other than "
+                                          "MFX_IOPATTERN_OUT_OPAQUE_MEMORY / "
+                                          "MFX_IOPATTERN_OUT_SYSTEM_MEMORY");
             return AVERROR_PATCHWELCOME;
         }
     }
@@ -557,9 +559,12 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         picture->pkt_pts = avpkt->pts;
         picture->pts     = avpkt->pts;
 
-        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_REPEATED;
-        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   & MFX_PICSTRUCT_FIELD_TFF;
-        picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct & MFX_PICSTRUCT_PROGRESSIVE);
+        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_TFF;
+        picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
+                                      MFX_PICSTRUCT_PROGRESSIVE);
 
         // since we do not know it yet from MSDK, let's do just a simple way for now
         picture->key_frame = (avctx->frame_number == 0) ? 1 : 0;
