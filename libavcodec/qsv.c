@@ -29,6 +29,7 @@
 #include "avcodec.h"
 #include "internal.h"
 #include "qsv.h"
+#include "qsv_internal.h"
 
 #if HAVE_THREADS
 // atomic ops
@@ -54,16 +55,16 @@
 #if HAVE_THREADS
 #define QSV_MUTEX_LOCK(x)                       \
     if (x)                                      \
-        pthread_mutex_lock(x)
+        pthread_mutex_lock(x);
 #define QSV_MUTEX_LOCK_COND(x, cond)            \
     if ((cond) && (x))                          \
-        pthread_mutex_lock(x)
+        pthread_mutex_lock(x);
 #define QSV_MUTEX_UNLOCK(x)                     \
     if (x)                                      \
-        pthread_mutex_unlock(x)
+        pthread_mutex_unlock(x);
 #define QSV_MUTEX_UNLOCK_COND(x, cond)          \
     if ((cond) && (x))                          \
-        pthread_mutex_unlock(x)
+        pthread_mutex_unlock(x);
 #define QSV_MUTEX_DESTROY(x)                    \
     if (x)                                      \
         pthread_mutex_destroy(&(x));
@@ -75,6 +76,48 @@
 #define QSV_MUTEX_UNLOCK_COND(x, cond)
 #define QSV_MUTEX_DESTROY(x)
 #endif
+
+int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
+{
+    int a, b;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
+
+    if (!p_surface || !qsv->pipes)
+        return 0;
+
+    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
+        list = av_qsv_list_item(qsv->pipes, a);
+        for (b = 0; b < av_qsv_list_count(list); b++) {
+            stage = av_qsv_list_item(list, b);
+            if (p_surface == stage->out.p_surface ||
+                p_surface == stage->in.p_surface)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
+{
+    int a, b;
+    av_qsv_list *list;
+    av_qsv_stage *stage;
+
+    if (!sync || !qsv->pipes)
+        return 0;
+
+    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
+        list = av_qsv_list_item(qsv->pipes, a);
+        for (b = 0; b < av_qsv_list_count(list); b++) {
+            stage = av_qsv_list_item(list, b);
+            if (sync == stage->out.p_sync) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
 
 int av_qsv_get_free_encode_task(av_qsv_list *tasks)
 {
@@ -153,48 +196,6 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
 #endif
     }
     return -1;
-}
-
-int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv)
-{
-    int a, b;
-    av_qsv_list *list;
-    av_qsv_stage *stage;
-
-    if (!p_surface || !qsv->pipes)
-        return 0;
-
-    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
-        list = av_qsv_list_item(qsv->pipes, a);
-        for (b = 0; b < av_qsv_list_count(list); b++) {
-            stage = av_qsv_list_item(list, b);
-            if (p_surface == stage->out.p_surface ||
-                p_surface == stage->in.p_surface)
-                return 1;
-        }
-    }
-    return 0;
-}
-
-int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
-{
-    int a, b;
-    av_qsv_list *list;
-    av_qsv_stage *stage;
-
-    if (!sync || !qsv->pipes)
-        return 0;
-
-    for (a = 0; a < av_qsv_list_count(qsv->pipes); a++) {
-        list = av_qsv_list_item(qsv->pipes, a);
-        for (b = 0; b < av_qsv_list_count(list); b++) {
-            stage = av_qsv_list_item(list, b);
-            if (sync == stage->out.p_sync) {
-                return 1;
-            }
-        }
-    }
-    return 0;
 }
 
 av_qsv_stage *av_qsv_stage_init(void)
@@ -293,13 +294,13 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     av_qsv_stage *stage;
     int size;
 
-    QSV_LOCK_MUTEX(list)
+    QSV_MUTEX_LOCK(list)
 
     size = av_qsv_list_count(list);
     if (size > 0)
         stage = av_qsv_list_item(list, size - 1);
 
-    QSV_UNLOCK_MUTEX(list)
+    QSV_MUTEX_LOCK(list)
 
     return stage;
 }

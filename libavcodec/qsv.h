@@ -109,10 +109,8 @@
 #include <windows.h>
 #endif
 #include <mfx/mfxvideo.h>
-
 #include "libavutil/log.h"
 
-#define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
 #ifndef AV_QSV_PRINT_RET_MSG
 #define AV_QSV_PRINT_RET_MSG(ERR)                                       \
     { av_log(NULL, AV_LOG_FATAL,                                        \
@@ -425,9 +423,6 @@ void av_qsv_dts_pop(av_qsv_context *qsv);
 av_qsv_stage *av_qsv_stage_init(void);
 void av_qsv_stage_clean(av_qsv_stage **stage);
 int av_qsv_context_clean(av_qsv_context *qsv);
-
-int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv);
-int ff_qsv_is_surface_in_pipe(mfxFrameSurface1 *p_surface, av_qsv_context *qsv);
 
 av_qsv_list *av_qsv_list_init(int is_threaded);
 int av_qsv_list_count(av_qsv_list *list);
