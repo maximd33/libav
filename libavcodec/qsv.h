@@ -110,15 +110,9 @@
 #endif
 #include <mfx/mfxvideo.h>
 
-#include "libavutil/mem.h"
-#include "libavutil/time.h"
+#include "libavutil/log.h"
 
-// sleep is defined in milliseconds
-#define av_qsv_sleep(x) av_usleep((x) * 1000)
-
-#define AV_QSV_ZERO_MEMORY(VAR)     { memset(&VAR, 0, sizeof(VAR)); }
 #define AV_QSV_ALIGN32(X)           (((mfxU32)((X) + 31)) & (~(mfxU32)31))
-#define AV_QSV_ALIGN16(value)       (((value + 15) >> 4) << 4)
 #ifndef AV_QSV_PRINT_RET_MSG
 #define AV_QSV_PRINT_RET_MSG(ERR)                                       \
     { av_log(NULL, AV_LOG_FATAL,                                        \
@@ -126,20 +120,14 @@
     }
 #endif
 
-#ifndef AV_QSV_DEBUG_ASSERT
-#define AV_QSV_DEBUG_ASSERT(x, y) { if ((x)) { av_log(NULL, AV_LOG_FATAL, "\nASSERT: %s\n", y); } }
-#endif
-
 #define AV_QSV_CHECK_RESULT(P, X, ERR)  { if ((X) > (P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
-#define AV_QSV_CHECK_POINTER(P, ERR)    { if (!(P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
-#define AV_QSV_IGNORE_MFX_STS(P, X)     { if ((X) == (P)) { P = MFX_ERR_NONE; } }
 
 #define AV_QSV_ID_BUFFER MFX_MAKEFOURCC('B', 'U', 'F', 'F')
 #define AV_QSV_ID_FRAME  MFX_MAKEFOURCC('F', 'R', 'M', 'E')
 
 #define AV_QSV_SURFACE_NUM              80
-#define AV_QSV_SYNC_NUM                 AV_QSV_SURFACE_NUM * 3 / 4
-#define AV_QSV_BUF_SIZE_DEFAULT         4096 * 2160 * 10
+#define AV_QSV_SYNC_NUM                 (AV_QSV_SURFACE_NUM * 3 / 4)
+#define AV_QSV_BUF_SIZE_DEFAULT         (4096 * 2160 * 10)
 #define AV_QSV_JOB_SIZE_DEFAULT         10
 #define AV_QSV_SYNC_TIME_DEFAULT        10000
 // see av_qsv_get_free_sync, av_qsv_get_free_surface , 100 if usleep(10*1000)(10ms) == 1 sec
