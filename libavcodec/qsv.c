@@ -189,9 +189,8 @@ int ff_qsv_is_sync_in_pipe(mfxSyncPoint *sync, av_qsv_context *qsv)
         list = av_qsv_list_item(qsv->pipes, a);
         for (b = 0; b < av_qsv_list_count(list); b++) {
             stage = av_qsv_list_item(list, b);
-            if (sync == stage->out.p_sync) {
+            if (sync == stage->out.p_sync)
                 return 1;
-            }
         }
     }
     return 0;
@@ -479,10 +478,9 @@ void av_qsv_list_insert(av_qsv_list *l, int pos, void *p)
             return;
     }
 
-    if (l->items_count != pos) {
+    if (l->items_count != pos)
         memmove(&l->items[pos + 1], &l->items[pos],
                 (l->items_count - pos) * sizeof(void *));
-    }
 
     l->items[pos] = p;
     l->items_count++;
