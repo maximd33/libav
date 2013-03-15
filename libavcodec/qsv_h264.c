@@ -257,7 +257,8 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
     } else {
         if (qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
             qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            avpriv_request_sample(avctx, "MFX_IOPATTERN_OUT_SYSTEM_MEMORY type");
+            avpriv_report_missing_feature(avctx,
+                    "Support of other type than MFX_IOPATTERN_OUT_OPAQUE_MEMORY/MFX_IOPATTERN_OUT_SYSTEM_MEMORY");
             return AVERROR_PATCHWELCOME;
         }
     }

@@ -1643,7 +1643,7 @@ zmbv_encoder_select="zlib"
 # hardware accelerators
 dxva2_deps="dxva2api_h"
 qsv_deps="mfx_mfxvideo_h"
-qsv_extralibs="-lmfx -lstdc++"
+qsv_extralibs="-lmfx"
 vaapi_deps="va_va_h"
 vda_deps="VideoDecodeAcceleration_VDADecoder_h pthreads"
 vda_extralibs="-framework CoreFoundation -framework VideoDecodeAcceleration -framework QuartzCore"
