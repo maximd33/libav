@@ -85,11 +85,9 @@ int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 
 int ff_qsv_dec_init(AVCodecContext *avctx)
 {
-    int ret               = 0;
     mfxStatus sts         = MFX_ERR_NONE;
     size_t current_offset = 6;
-    int header_size       = 0;
-    int i                 = 0;
+    int i, header_size    = 0;
     unsigned char *current_position;
     size_t current_size;
 
@@ -99,7 +97,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     qsv->impl = qsv_config_context->impl_requested;
 
-    AV_QSV_ZERO_MEMORY(qsv->mfx_session);
+    memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
     qsv->ver.Major = AV_QSV_MSDK_VERSION_MAJOR;
     qsv->ver.Minor = AV_QSV_MSDK_VERSION_MINOR;
 
@@ -168,7 +166,8 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     sts = MFXVideoDECODE_QueryIOSurf(qsv->mfx_session,
                                      &qsv_decode->m_mfxVideoParam,
                                      qsv_decode->request);
-    AV_QSV_IGNORE_MFX_STS(sts, MFX_WRN_PARTIAL_ACCELERATION);
+    if (sts == MFX_WRN_PARTIAL_ACCELERATION)
+        sts = MFX_ERR_NONE;
     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
@@ -203,7 +202,10 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
 
     for (i = 0; i < qsv_decode->surface_num; i++) {
         qsv_decode->p_surfaces[i] = av_mallocz(sizeof(*qsv_decode->p_surfaces[i]));
-        AV_QSV_CHECK_POINTER(qsv_decode->p_surfaces[i], AVERROR(ENOMEM));
+        if (!(qsv_decode->p_surfaces[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
         memcpy(&(qsv_decode->p_surfaces[i]->Info),
                &(qsv_decode->request[0].Info),
                sizeof(qsv_decode->p_surfaces[i]->Info));
@@ -219,7 +221,10 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     qsv_decode->sync_num = FFMIN(qsv_decode->surface_num, AV_QSV_SYNC_NUM);
     for (i = 0; i < qsv_decode->sync_num; i++) {
         qsv_decode->p_sync[i] = av_mallocz(sizeof(*qsv_decode->p_sync[i]));
-        AV_QSV_CHECK_POINTER(qsv_decode->p_sync[i], AVERROR(ENOMEM));
+        if (!(qsv_decode->p_sync[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
     }
 
     memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(qsv_decode->ext_opaque_alloc));
@@ -241,7 +246,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
 
     qsv_decode->is_init_done = 1;
-    return ret;
+    return 0;
 }
 
 static av_cold int qsv_decode_init(AVCodecContext *avctx)
@@ -438,7 +443,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             }
 
             if (sts == MFX_WRN_DEVICE_BUSY)
-                av_qsv_sleep(10);
+                av_usleep(10000);
 
             sync_idx = av_qsv_get_free_sync(qsv_decode, qsv);
             if (sync_idx == -1) {
