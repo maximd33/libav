@@ -242,7 +242,7 @@ int av_qsv_context_clean(av_qsv_context *qsv)
             while (av_qsv_list_count(qsv->dts_seq))
                 av_qsv_dts_pop(qsv);
 
-            av_qsv_list_close(&qsv->dts_seq);
+            av_qsv_list_close(qsv->dts_seq);
         }
         QSV_MUTEX_DESTROY(qsv->qts_seq_mutex);
         qsv->qts_seq_mutex = 0;
@@ -275,7 +275,7 @@ void av_qsv_pipe_list_clean(av_qsv_list **list)
             stage = av_qsv_list_item(*list, i - 1);
             av_qsv_flush_stages(*list, &stage);
         }
-        av_qsv_list_close(list);
+        av_qsv_list_close(*list);
     }
 }
 
@@ -313,7 +313,7 @@ void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list **item)
         av_qsv_stage_clean(&stage);
     }
     av_qsv_list_rem(list, *item);
-    av_qsv_list_close(item);
+    av_qsv_list_close(*item);
 }
 
 av_qsv_list *av_qsv_pipe_by_stage(av_qsv_list *list, av_qsv_stage *stage)
@@ -490,16 +490,14 @@ void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem)
     QSV_MUTEX_UNLOCK(list->mutex);
 }
 
-void av_qsv_list_close(av_qsv_list **list)
+void av_qsv_list_close(av_qsv_list *list)
 {
-    av_qsv_list *l = *list_close;
+    QSV_MUTEX_DESTROY(list->mutex);
 
-    QSV_MUTEX_DESTROY(l->mutex);
+    av_free(list->items);
+    av_free(list);
 
-    av_free(l->items);
-    av_free(l);
-
-    *list_close = NULL;
+    list = NULL;
 }
 
 int av_is_qsv_available(mfxIMPL impl, mfxVersion *ver)
