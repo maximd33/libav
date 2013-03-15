@@ -25,6 +25,7 @@
  */
 
 #include "config.h"
+#include "libavutil/time.h"
 #include "avcodec.h"
 #include "internal.h"
 #include "qsv.h"

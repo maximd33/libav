@@ -24,8 +24,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "qsv_h264.h"
+#include "libavutil/time.h"
 #include "h264.h"
+#include "qsv_h264.h"
 
 static av_qsv_config av_qsv_default_config = {
     .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,
