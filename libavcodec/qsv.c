@@ -25,6 +25,12 @@
  */
 
 #include "config.h"
+#if HAVE_PTHREADS
+#include <pthread.h>
+#elif HAVE_W32THREADS
+#include "w32pthreads.h"
+#endif
+
 #include "libavutil/time.h"
 #include "avcodec.h"
 #include "internal.h"
@@ -41,12 +47,6 @@
 #define ff_qsv_atomic_inc(ptr) InterlockedIncrement(ptr)
 #define ff_qsv_atomic_dec(ptr) InterlockedDecrement(ptr)
 #endif
-// threading implementation
-#if HAVE_PTHREADS
-#include <pthread.h>
-#elif HAVE_W32THREADS
-#include "w32pthreads.h"
-#endif
 #else
 #define ff_qsv_atomic_inc(ptr) (*(ptr)++)
 #define ff_qsv_atomic_dec(ptr) (*(ptr)--)
@@ -55,19 +55,19 @@
 #if HAVE_THREADS
 #define QSV_MUTEX_LOCK(x)                       \
     if (x)                                      \
-        pthread_mutex_lock(x);
+        pthread_mutex_lock(x)
 #define QSV_MUTEX_LOCK_COND(x, cond)            \
     if ((cond) && (x))                          \
-        pthread_mutex_lock(x);
+        pthread_mutex_lock(x)
 #define QSV_MUTEX_UNLOCK(x)                     \
     if (x)                                      \
-        pthread_mutex_unlock(x);
+        pthread_mutex_unlock(x)
 #define QSV_MUTEX_UNLOCK_COND(x, cond)          \
     if ((cond) && (x))                          \
-        pthread_mutex_unlock(x);
+        pthread_mutex_unlock(x)
 #define QSV_MUTEX_DESTROY(x)                    \
     if (x)                                      \
-        pthread_mutex_destroy(&(x));
+        pthread_mutex_destroy(&(x))
 
 #else
 #define QSV_MUTEX_LOCK(x)
@@ -135,7 +135,7 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
         for (i = from; i < up; i++)
             if ((!space->p_surfaces[i]->Data.Locked) &&
                 !ff_qsv_is_surface_in_pipe(space->p_surfaces[i], qsv)) {
-                memcpy(&(space->p_surfaces[i]->Info), info,
+                memcpy(&space->p_surfaces[i]->Info, info,
                        sizeof(space->p_surfaces[i]->Info));
                 if (i > space->surface_num_max_used)
                     space->surface_num_max_used = i;
@@ -292,13 +292,13 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     av_qsv_stage *stage;
     int size;
 
-    QSV_MUTEX_LOCK(list)
+    QSV_MUTEX_LOCK(list);
 
     size = av_qsv_list_count(list);
     if (size > 0)
         stage = av_qsv_list_item(list, size - 1);
 
-    QSV_MUTEX_LOCK(list)
+    QSV_MUTEX_LOCK(list);
 
     return stage;
 }
@@ -312,7 +312,7 @@ void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list *item)
         stage = av_qsv_list_item(item, i);
         av_qsv_stage_clean(stage);
     }
-    av_qsv_list_rem(list, item);
+    av_qsv_list_del(list, item);
     av_qsv_list_close(item);
 }
 
@@ -375,7 +375,7 @@ void av_qsv_dts_pop(av_qsv_context *qsv)
 
     if (av_qsv_list_count(qsv->dts_seq)) {
         item = av_qsv_list_item(qsv->dts_seq, 0);
-        av_qsv_list_rem(qsv->dts_seq, item);
+        av_qsv_list_del(qsv->dts_seq, item);
         av_free(item);
     }
     QSV_MUTEX_UNLOCK_COND(qsv, qsv->qts_seq_mutex);
@@ -406,7 +406,7 @@ av_qsv_list *av_qsv_list_init(int is_threaded)
             pthread_mutex_init(l->mutex, NULL);
     } else
 #endif
-    l->mutex = 0;
+    l->mutex = NULL;
     return l;
 }
 
@@ -440,7 +440,7 @@ int av_qsv_list_add(av_qsv_list *list, void *elem)
     return pos;
 }
 
-void av_qsv_list_rem(av_qsv_list *list, void *elem)
+void av_qsv_list_del(av_qsv_list *list, void *elem)
 {
     int i;
 

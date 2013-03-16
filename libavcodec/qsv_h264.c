@@ -86,7 +86,7 @@ int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 
 int ff_qsv_dec_init(AVCodecContext *avctx)
 {
-    mfxStatus sts         = MFX_ERR_NONE;
+    mfxStatus sts;
     size_t current_offset = 6;
     int i, header_size    = 0;
     unsigned char *current_position;
@@ -356,27 +356,20 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
 static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                             int *data_size, AVPacket *avpkt)
 {
-    mfxStatus sts                     = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_context *qsv               = avctx->priv_data;
-    av_qsv_space *qsv_decode          = qsv->dec_space;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    int *got_picture_ptr              = data_size;
-    int ret_value                     = 1;
-    uint8_t *current_position         = avpkt->data;
-    int current_size                  = avpkt->size;
-    int frame_processed               = 0;
-    size_t frame_length               = 0;
-    int surface_idx                   = 0;
-
-    int sync_idx = 0;
-    int current_nal_size;
-    unsigned char nal_type;
+    av_qsv_space *qsv_decode = qsv->dec_space;
     av_qsv_stage *new_stage;
+    av_qsv_list *qsv_atom, *pipe;
+    uint8_t *current_position = avpkt->data;
+    int current_size          = avpkt->size;
+    size_t frame_length = 0, current_offset = 2;
+    int *got_picture_ptr = data_size;
+    int frame_processed = 0, surface_idx = 0, sync_idx = 0;
+    int ret_value = 1, current_nal_size;
+    unsigned char nal_type;
     mfxBitstream *input_bs  = NULL;
-    size_t current_offset   = 2;
-    av_qsv_list *qsv_atom;
-    av_qsv_list *pipe;
-
     AVFrame *picture = data;
 
     *got_picture_ptr = 0;
@@ -432,9 +425,9 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
         sts = MFX_ERR_NONE;
         // ignore warnings, where warnings >0 , and not error codes <0
-        while (MFX_ERR_NONE         <= sts ||
-               MFX_ERR_MORE_SURFACE == sts ||
-               MFX_WRN_DEVICE_BUSY  == sts) {
+        while (sts <= MFX_ERR_NONE         ||
+               sts == MFX_ERR_MORE_SURFACE ||
+               sts == MFX_WRN_DEVICE_BUSY) {
             if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
                 surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
                                                       &qsv_decode->request[0].Info,
@@ -606,14 +599,10 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,
                                  mfxFrameAllocResponse *response)
 {
-    mfxStatus sts = MFX_ERR_NONE;
-
-    mfxU32 numAllocated = 0;
-
+    mfxStatus sts;
+    mfxU32 numAllocated = 0, nbytes;
     mfxU32 width  = FFALIGN(request->Info.Width, 32);
     mfxU32 height = FFALIGN(request->Info.Height, 32);
-    mfxU32 nbytes;
-
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     av_qsv_alloc_frame *fs;
 
@@ -680,7 +669,6 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     mfxStatus sts;
     av_qsv_alloc_frame *fs;
     mfxU16 width, height;
-
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
 
     if (!this_alloc->space)
@@ -761,7 +749,7 @@ mfxStatus ff_qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle)
 
 mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 {
-    mfxStatus sts                       = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     int i;
 
@@ -782,7 +770,7 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 
     av_freep(&response->mids);
 
-    return sts;
+    return MFX_ERR_NONE;
 }
 
 mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,

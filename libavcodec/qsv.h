@@ -137,19 +137,18 @@
 #define AV_QSV_MSDK_VERSION_MAJOR  1
 #define AV_QSV_MSDK_VERSION_MINOR  3
 
-typedef enum AV_QSV_STAGE_TYPE {
 #define AV_QSV_DECODE_MASK   0x001
-    AV_QSV_DECODE = 0x001,
-
 #define AV_QSV_VPP_MASK      0x0F0
+#define AV_QSV_ENCODE_MASK   0x100
+#define AV_QSV_ANY_MASK      0xFFF
+
+typedef enum AV_QSV_STAGE_TYPE {
+    AV_QSV_DECODE      = 0x001,
     // "Mandatory VPP filter" , might be with "Hint-based VPP filters"
     AV_QSV_VPP_DEFAULT = 0x010,
     // "User Modules" etc
-    AV_QSV_VPP_USER = 0x020,
-
-#define AV_QSV_ENCODE_MASK   0x100
-    AV_QSV_ENCODE = 0x100
-#define AV_QSV_ANY_MASK      0xFFF
+    AV_QSV_VPP_USER    = 0x020,
+    AV_QSV_ENCODE      = 0x100
 } AV_QSV_STAGE_TYPE;
 
 typedef struct av_qsv_stage {
@@ -428,7 +427,7 @@ int av_qsv_context_clean(av_qsv_context *qsv);
 av_qsv_list *av_qsv_list_init(int is_threaded);
 int av_qsv_list_count(av_qsv_list *list);
 int av_qsv_list_add(av_qsv_list *list, void *elem);
-void av_qsv_list_rem(av_qsv_list *list, void *elem);
+void av_qsv_list_del(av_qsv_list *list, void *elem);
 void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem);
 void *av_qsv_list_item(av_qsv_list *list, int i);
 void av_qsv_list_close(av_qsv_list *list);
