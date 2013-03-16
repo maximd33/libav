@@ -109,6 +109,7 @@
 #include <windows.h>
 #endif
 #include <mfx/mfxvideo.h>
+
 #include "libavutil/log.h"
 
 #ifndef AV_QSV_PRINT_RET_MSG

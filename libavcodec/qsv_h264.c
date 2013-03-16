@@ -610,8 +610,8 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
 
     mfxU32 numAllocated = 0;
 
-    mfxU32 width  = FFALIGN(request->Info.Width,32);
-    mfxU32 height = FFALIGN(request->Info.Height,32);
+    mfxU32 width  = FFALIGN(request->Info.Width, 32);
+    mfxU32 height = FFALIGN(request->Info.Height, 32);
     mfxU32 nbytes;
 
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
@@ -646,7 +646,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
     // allocate frames
     for (numAllocated = 0; numAllocated < request->NumFrameSuggested; numAllocated++) {
         sts = this_alloc->buffer_alloc.Alloc(this_alloc->buffer_alloc.pthis,
-                                             nbytes + FFALIGN(sizeof(av_qsv_alloc_frame),32),
+                                             nbytes + FFALIGN(sizeof(av_qsv_alloc_frame), 32),
                                              request->Type,
                                              &this_alloc->space->mids[numAllocated]);
 
@@ -698,9 +698,9 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
         return MFX_ERR_INVALID_HANDLE;
     }
 
-    width  = (mfxU16)FFALIGN(fs->info.Width,32);
-    height = (mfxU16)FFALIGN(fs->info.Height,32);
-    ptr->B = ptr->Y = (mfxU8 *)fs + FFALIGN(sizeof(av_qsv_allocators_space),32);
+    width  = (mfxU16)FFALIGN(fs->info.Width, 32);
+    height = (mfxU16)FFALIGN(fs->info.Height, 32);
+    ptr->B = ptr->Y = (mfxU8 *)fs + FFALIGN(sizeof(av_qsv_allocators_space), 32);
 
     switch (fs->info.FourCC) {
     case MFX_FOURCC_NV12:
@@ -797,7 +797,7 @@ mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
     if (!(type & MFX_MEMTYPE_SYSTEM_MEMORY))
         return MFX_ERR_UNSUPPORTED;
 
-    header_size = FFALIGN(sizeof(av_qsv_alloc_buffer),32);
+    header_size = FFALIGN(sizeof(av_qsv_alloc_buffer), 32);
     bs          = av_malloc(header_size + nbytes);
 
     if (!bs)
@@ -825,7 +825,7 @@ mfxStatus ff_qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr)
     if (bs->id != AV_QSV_ID_BUFFER)
         return MFX_ERR_INVALID_HANDLE;
 
-    *ptr = (mfxU8 *)bs + FFALIGN(sizeof(av_qsv_alloc_buffer),32);
+    *ptr = (mfxU8 *)bs + FFALIGN(sizeof(av_qsv_alloc_buffer), 32);
     return MFX_ERR_NONE;
 }
 
