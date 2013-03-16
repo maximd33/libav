@@ -25,6 +25,12 @@
  */
 
 #include "config.h"
+#if HAVE_PTHREADS
+#include <pthread.h>
+#elif HAVE_W32THREADS
+#include "w32pthreads.h"
+#endif
+
 #include "libavutil/time.h"
 #include "avcodec.h"
 #include "internal.h"
@@ -40,12 +46,6 @@
 #include <windows.h>
 #define ff_qsv_atomic_inc(ptr) InterlockedIncrement(ptr)
 #define ff_qsv_atomic_dec(ptr) InterlockedDecrement(ptr)
-#endif
-// threading implementation
-#if HAVE_PTHREADS
-#include <pthread.h>
-#elif HAVE_W32THREADS
-#include "w32pthreads.h"
 #endif
 #else
 #define ff_qsv_atomic_inc(ptr) (*(ptr)++)
