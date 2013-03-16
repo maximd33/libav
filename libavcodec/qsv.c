@@ -36,7 +36,7 @@
 #if defined (__GNUC__)
 #define ff_qsv_atomic_inc(ptr) __sync_add_and_fetch(ptr, 1)
 #define ff_qsv_atomic_dec(ptr) __sync_sub_and_fetch(ptr, 1)
-#elif HAVE_WINDOWS_H               // MSVC case
+#elif HAVE_WINDOWS_H
 #include <windows.h>
 #define ff_qsv_atomic_inc(ptr) InterlockedIncrement(ptr)
 #define ff_qsv_atomic_dec(ptr) InterlockedDecrement(ptr)
