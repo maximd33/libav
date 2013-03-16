@@ -143,12 +143,12 @@
 #define AV_QSV_ANY_MASK      0xFFF
 
 typedef enum AV_QSV_STAGE_TYPE {
-    AV_QSV_DECODE      = 0x001,
+    AV_QSV_DECODE = 0x001,
     // "Mandatory VPP filter" , might be with "Hint-based VPP filters"
     AV_QSV_VPP_DEFAULT = 0x010,
     // "User Modules" etc
-    AV_QSV_VPP_USER    = 0x020,
-    AV_QSV_ENCODE      = 0x100
+    AV_QSV_VPP_USER = 0x020,
+    AV_QSV_ENCODE   = 0x100
 } AV_QSV_STAGE_TYPE;
 
 typedef struct av_qsv_stage {

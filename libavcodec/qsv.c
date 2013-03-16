@@ -432,7 +432,7 @@ int av_qsv_list_add(av_qsv_list *list, void *elem)
     }
 
     list->items[list->items_count] = elem;
-    pos = list->items_count;
+    pos                            = list->items_count;
     list->items_count++;
 
     QSV_MUTEX_UNLOCK(list->mutex);
