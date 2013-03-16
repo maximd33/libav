@@ -406,7 +406,7 @@ av_qsv_list *av_qsv_list_init(int is_threaded)
             pthread_mutex_init(l->mutex, NULL);
     } else
 #endif
-    l->mutex = 0;
+    l->mutex = NULL;
     return l;
 }
 
