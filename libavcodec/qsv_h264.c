@@ -356,27 +356,20 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
 static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                             int *data_size, AVPacket *avpkt)
 {
-    mfxStatus sts                     = MFX_ERR_NONE;
+    mfxStatus sts = MFX_ERR_NONE;
     av_qsv_context *qsv               = avctx->priv_data;
-    av_qsv_space *qsv_decode          = qsv->dec_space;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    int *got_picture_ptr              = data_size;
-    int ret_value                     = 1;
-    uint8_t *current_position         = avpkt->data;
-    int current_size                  = avpkt->size;
-    int frame_processed               = 0;
-    size_t frame_length               = 0;
-    int surface_idx                   = 0;
-
-    int sync_idx = 0;
-    int current_nal_size;
-    unsigned char nal_type;
+    av_qsv_space *qsv_decode = qsv->dec_space;
     av_qsv_stage *new_stage;
+    av_qsv_list *qsv_atom, *pipe;
+    uint8_t *current_position = avpkt->data;
+    int current_size          = avpkt->size;
+    size_t frame_length = 0, current_offset = 2;
+    int *got_picture_ptr = data_size;
+    int frame_processed = 0, surface_idx = 0, sync_idx = 0;
+    int ret_value = 1, current_nal_size;
+    unsigned char nal_type;
     mfxBitstream *input_bs  = NULL;
-    size_t current_offset   = 2;
-    av_qsv_list *qsv_atom;
-    av_qsv_list *pipe;
-
     AVFrame *picture = data;
 
     *got_picture_ptr = 0;
@@ -607,13 +600,9 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocResponse *response)
 {
     mfxStatus sts = MFX_ERR_NONE;
-
-    mfxU32 numAllocated = 0;
-
+    mfxU32 numAllocated = 0, nbytes;
     mfxU32 width  = FFALIGN(request->Info.Width, 32);
     mfxU32 height = FFALIGN(request->Info.Height, 32);
-    mfxU32 nbytes;
-
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     av_qsv_alloc_frame *fs;
 
@@ -680,7 +669,6 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     mfxStatus sts;
     av_qsv_alloc_frame *fs;
     mfxU16 width, height;
-
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
 
     if (!this_alloc->space)
