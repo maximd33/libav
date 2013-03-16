@@ -28,47 +28,10 @@
 #include "h264.h"
 #include "qsv_h264.h"
 
-static av_qsv_config av_qsv_default_config = {
-    .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,
-    .target_usage       = MFX_TARGETUSAGE_BALANCED,
-    .num_ref_frame      = 0,
-    .gop_ref_dist       = 0,
-    .gop_pic_size       = 0,
-    .io_pattern         = MFX_IOPATTERN_OUT_SYSTEM_MEMORY,
-    .additional_buffers = 0,
-    .sync_need          = AV_QSV_SYNC_TIME_DEFAULT,
-    .resource_free      = 1,
-    .dts_need           = 0,
-    .impl_requested     = MFX_IMPL_AUTO,
-    .usage_threaded     = 0,
-    .allocators         = 0,
-};
-
-static av_qsv_allocators_space av_qsv_default_system_allocators = {
-    // fill to access mids
-    .space        = 0,
-
-    .frame_alloc  = {
-        .pthis  = &av_qsv_default_system_allocators,
-        .Alloc  = ff_qsv_mem_frame_alloc,
-        .Lock   = ff_qsv_mem_frame_lock,
-        .Unlock = ff_qsv_mem_frame_unlock,
-        .GetHDL = ff_qsv_mem_frame_getHDL,
-        .Free   = ff_qsv_mem_frame_free,
-    },
-    .buffer_alloc = {
-        .pthis  = &av_qsv_default_system_allocators,
-        .Alloc  = ff_qsv_mem_buffer_alloc,
-        .Lock   = ff_qsv_mem_buffer_lock,
-        .Unlock = ff_qsv_mem_buffer_unlock,
-        .Free   = ff_qsv_mem_buffer_free,
-    },
-};
-
 static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
 static const uint8_t qsv_slice_code[]  = { 0x00, 0x00, 0x01, 0x65 };
 
-int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
+static int qsv_nal_find_start_code(uint8_t *pb, size_t size)
 {
     if (size < 4)
         return 0;
@@ -84,7 +47,7 @@ int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
     return 0;
 }
 
-int ff_qsv_dec_init(AVCodecContext *avctx)
+static int qsv_dec_init(AVCodecContext *avctx)
 {
     mfxStatus sts;
     size_t current_offset = 6;
@@ -112,7 +75,7 @@ int ff_qsv_dec_init(AVCodecContext *avctx)
     current_position = avctx->extradata;
     current_size     = avctx->extradata_size;
 
-    if (!ff_qsv_nal_find_start_code(current_position, current_size)) {
+    if (!qsv_nal_find_start_code(current_position, current_size)) {
         while (current_offset <= current_size) {
             int current_nal_size = current_position[current_offset] << 8 |
                                    current_position[current_offset + 1];
@@ -297,8 +260,7 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
                              qsv_config_context->usage_threaded :
                              HAVE_THREADS);
 
-    // allocation of p_sync and p_surfaces inside of ff_qsv_dec_init
-    return ff_qsv_dec_init(avctx);
+    return qsv_dec_init(avctx);
 }
 
 static av_cold int qsv_decode_end(AVCodecContext *avctx)
@@ -595,7 +557,7 @@ static void qsv_flush_dpb(AVCodecContext *avctx)
     qsv_decode->bs.MaxLength  = qsv_decode->p_buf_max_size;
 }
 
-mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
+static mfxStatus qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,
                                  mfxFrameAllocResponse *response)
 {
@@ -664,7 +626,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
+static mfxStatus qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     mfxStatus sts;
     av_qsv_alloc_frame *fs;
@@ -724,7 +686,7 @@ mfxStatus ff_qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
+static mfxStatus qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     mfxStatus sts = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
@@ -742,12 +704,12 @@ mfxStatus ff_qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle)
+static mfxStatus qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle)
 {
     return MFX_ERR_UNSUPPORTED;
 }
 
-mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
+static mfxStatus qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 {
     mfxStatus sts;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
@@ -773,7 +735,7 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
+static mfxStatus qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
                                   mfxMemId *mid)
 {
     av_qsv_alloc_buffer *bs;
@@ -799,7 +761,7 @@ mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr)
+static mfxStatus qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr)
 {
     av_qsv_alloc_buffer *bs;
 
@@ -817,7 +779,7 @@ mfxStatus ff_qsv_mem_buffer_lock(mfxHDL pthis, mfxMemId mid, mfxU8 **ptr)
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_buffer_unlock(mfxHDL pthis, mfxMemId mid)
+static mfxStatus qsv_mem_buffer_unlock(mfxHDL pthis, mfxMemId mid)
 {
     av_qsv_alloc_buffer *bs = (av_qsv_alloc_buffer *)mid;
 
@@ -827,7 +789,7 @@ mfxStatus ff_qsv_mem_buffer_unlock(mfxHDL pthis, mfxMemId mid)
     return MFX_ERR_NONE;
 }
 
-mfxStatus ff_qsv_mem_buffer_free(mfxHDL pthis, mfxMemId mid)
+static mfxStatus qsv_mem_buffer_free(mfxHDL pthis, mfxMemId mid)
 {
     av_qsv_alloc_buffer *bs = (av_qsv_alloc_buffer *)mid;
     if (!bs || AV_QSV_ID_BUFFER != bs->id)
@@ -836,6 +798,43 @@ mfxStatus ff_qsv_mem_buffer_free(mfxHDL pthis, mfxMemId mid)
     av_freep(&bs);
     return MFX_ERR_NONE;
 }
+
+av_qsv_config av_qsv_default_config = {
+    .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,
+    .target_usage       = MFX_TARGETUSAGE_BALANCED,
+    .num_ref_frame      = 0,
+    .gop_ref_dist       = 0,
+    .gop_pic_size       = 0,
+    .io_pattern         = MFX_IOPATTERN_OUT_SYSTEM_MEMORY,
+    .additional_buffers = 0,
+    .sync_need          = AV_QSV_SYNC_TIME_DEFAULT,
+    .resource_free      = 1,
+    .dts_need           = 0,
+    .impl_requested     = MFX_IMPL_AUTO,
+    .usage_threaded     = 0,
+    .allocators         = 0,
+};
+
+av_qsv_allocators_space av_qsv_default_system_allocators = {
+    // fill to access mids
+    .space        = 0,
+
+    .frame_alloc  = {
+        .pthis  = &av_qsv_default_system_allocators,
+        .Alloc  = qsv_mem_frame_alloc,
+        .Lock   = qsv_mem_frame_lock,
+        .Unlock = qsv_mem_frame_unlock,
+        .GetHDL = qsv_mem_frame_getHDL,
+        .Free   = qsv_mem_frame_free,
+    },
+    .buffer_alloc = {
+        .pthis  = &av_qsv_default_system_allocators,
+        .Alloc  = qsv_mem_buffer_alloc,
+        .Lock   = qsv_mem_buffer_lock,
+        .Unlock = qsv_mem_buffer_unlock,
+        .Free   = qsv_mem_buffer_free,
+    },
+};
 
 AVCodec ff_h264_qsv_decoder = {
     .name         = "h264_qsv",
