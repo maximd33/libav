@@ -428,7 +428,7 @@ int av_qsv_context_clean(av_qsv_context *qsv);
 av_qsv_list *av_qsv_list_init(int is_threaded);
 int av_qsv_list_count(av_qsv_list *list);
 int av_qsv_list_add(av_qsv_list *list, void *elem);
-void av_qsv_list_rem(av_qsv_list *list, void *elem);
+void av_qsv_list_del(av_qsv_list *list, void *elem);
 void av_qsv_list_insert(av_qsv_list *list, int pos, void *elem);
 void *av_qsv_list_item(av_qsv_list *list, int i);
 void av_qsv_list_close(av_qsv_list *list);

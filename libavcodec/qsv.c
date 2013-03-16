@@ -312,7 +312,7 @@ void av_qsv_flush_stages(av_qsv_list *list, av_qsv_list *item)
         stage = av_qsv_list_item(item, i);
         av_qsv_stage_clean(stage);
     }
-    av_qsv_list_rem(list, item);
+    av_qsv_list_del(list, item);
     av_qsv_list_close(item);
 }
 
@@ -375,7 +375,7 @@ void av_qsv_dts_pop(av_qsv_context *qsv)
 
     if (av_qsv_list_count(qsv->dts_seq)) {
         item = av_qsv_list_item(qsv->dts_seq, 0);
-        av_qsv_list_rem(qsv->dts_seq, item);
+        av_qsv_list_del(qsv->dts_seq, item);
         av_free(item);
     }
     QSV_MUTEX_UNLOCK_COND(qsv, qsv->qts_seq_mutex);
@@ -440,7 +440,7 @@ int av_qsv_list_add(av_qsv_list *list, void *elem)
     return pos;
 }
 
-void av_qsv_list_rem(av_qsv_list *list, void *elem)
+void av_qsv_list_del(av_qsv_list *list, void *elem)
 {
     int i;
 
