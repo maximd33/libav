@@ -86,7 +86,7 @@ int ff_qsv_nal_find_start_code(uint8_t *pb, size_t size)
 
 int ff_qsv_dec_init(AVCodecContext *avctx)
 {
-    mfxStatus sts         = MFX_ERR_NONE;
+    mfxStatus sts;
     size_t current_offset = 6;
     int i, header_size    = 0;
     unsigned char *current_position;
@@ -356,7 +356,7 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
 static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                             int *data_size, AVPacket *avpkt)
 {
-    mfxStatus sts = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_context *qsv               = avctx->priv_data;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
     av_qsv_space *qsv_decode = qsv->dec_space;
@@ -599,7 +599,7 @@ mfxStatus ff_qsv_mem_frame_alloc(mfxHDL pthis,
                                  mfxFrameAllocRequest *request,
                                  mfxFrameAllocResponse *response)
 {
-    mfxStatus sts = MFX_ERR_NONE;
+    mfxStatus sts;
     mfxU32 numAllocated = 0, nbytes;
     mfxU32 width  = FFALIGN(request->Info.Width, 32);
     mfxU32 height = FFALIGN(request->Info.Height, 32);
@@ -749,7 +749,7 @@ mfxStatus ff_qsv_mem_frame_getHDL(mfxHDL pthis, mfxMemId mid, mfxHDL *handle)
 
 mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 {
-    mfxStatus sts                       = MFX_ERR_NONE;
+    mfxStatus sts;
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     int i;
 
@@ -770,7 +770,7 @@ mfxStatus ff_qsv_mem_frame_free(mfxHDL pthis, mfxFrameAllocResponse *response)
 
     av_freep(&response->mids);
 
-    return sts;
+    return MFX_ERR_NONE;
 }
 
 mfxStatus ff_qsv_mem_buffer_alloc(mfxHDL pthis, mfxU32 nbytes, mfxU16 type,
