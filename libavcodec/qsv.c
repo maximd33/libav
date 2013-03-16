@@ -135,7 +135,7 @@ int av_qsv_get_free_surface(av_qsv_space *space, av_qsv_context *qsv,
         for (i = from; i < up; i++)
             if ((!space->p_surfaces[i]->Data.Locked) &&
                 !ff_qsv_is_surface_in_pipe(space->p_surfaces[i], qsv)) {
-                memcpy(&(space->p_surfaces[i]->Info), info,
+                memcpy(&space->p_surfaces[i]->Info, info,
                        sizeof(space->p_surfaces[i]->Info));
                 if (i > space->surface_num_max_used)
                     space->surface_num_max_used = i;
