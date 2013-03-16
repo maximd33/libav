@@ -425,7 +425,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
         sts = MFX_ERR_NONE;
         // ignore warnings, where warnings >0 , and not error codes <0
-        while (sts <= MFX_ERR_NONE         ||
+        while (sts >= MFX_ERR_NONE         ||
                sts == MFX_ERR_MORE_SURFACE ||
                sts == MFX_WRN_DEVICE_BUSY) {
             if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
