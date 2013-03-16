@@ -55,19 +55,19 @@
 #if HAVE_THREADS
 #define QSV_MUTEX_LOCK(x)                       \
     if (x)                                      \
-        pthread_mutex_lock(x);
+        pthread_mutex_lock(x)
 #define QSV_MUTEX_LOCK_COND(x, cond)            \
     if ((cond) && (x))                          \
-        pthread_mutex_lock(x);
+        pthread_mutex_lock(x)
 #define QSV_MUTEX_UNLOCK(x)                     \
     if (x)                                      \
-        pthread_mutex_unlock(x);
+        pthread_mutex_unlock(x)
 #define QSV_MUTEX_UNLOCK_COND(x, cond)          \
     if ((cond) && (x))                          \
-        pthread_mutex_unlock(x);
+        pthread_mutex_unlock(x)
 #define QSV_MUTEX_DESTROY(x)                    \
     if (x)                                      \
-        pthread_mutex_destroy(&(x));
+        pthread_mutex_destroy(&(x))
 
 #else
 #define QSV_MUTEX_LOCK(x)
@@ -292,13 +292,13 @@ av_qsv_stage *av_qsv_get_last_stage(av_qsv_list *list)
     av_qsv_stage *stage;
     int size;
 
-    QSV_MUTEX_LOCK(list)
+    QSV_MUTEX_LOCK(list);
 
     size = av_qsv_list_count(list);
     if (size > 0)
         stage = av_qsv_list_item(list, size - 1);
 
-    QSV_MUTEX_LOCK(list)
+    QSV_MUTEX_LOCK(list);
 
     return stage;
 }
