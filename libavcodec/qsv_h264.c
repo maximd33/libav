@@ -28,6 +28,9 @@
 #include "h264.h"
 #include "qsv_h264.h"
 
+static av_qsv_config av_qsv_default_config;
+static av_qsv_allocators_space av_qsv_default_system_allocators;
+
 static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
 static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
 
@@ -799,7 +802,7 @@ static mfxStatus qsv_mem_buffer_free(mfxHDL pthis, mfxMemId mid)
     return MFX_ERR_NONE;
 }
 
-av_qsv_config av_qsv_default_config = {
+static av_qsv_config av_qsv_default_config = {
     .async_depth        = AV_QSV_ASYNC_DEPTH_DEFAULT,
     .target_usage       = MFX_TARGETUSAGE_BALANCED,
     .num_ref_frame      = 0,
@@ -815,7 +818,7 @@ av_qsv_config av_qsv_default_config = {
     .allocators         = 0,
 };
 
-av_qsv_allocators_space av_qsv_default_system_allocators = {
+static av_qsv_allocators_space av_qsv_default_system_allocators = {
     // fill to access mids
     .space        = 0,
 

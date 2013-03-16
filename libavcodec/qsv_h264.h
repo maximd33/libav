@@ -34,7 +34,6 @@
 #include "avcodec.h"
 #include "qsv.h"
 
-av_qsv_config av_qsv_default_config;
-av_qsv_allocators_space av_qsv_default_system_allocators;
+
 
 #endif /* AVCODEC_QSV_H264_H */
