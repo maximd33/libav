@@ -849,3 +849,4 @@ AVCodec ff_h264_qsv_decoder = {
     .pix_fmts     = (const enum PixelFormat[]) { AV_PIX_FMT_QSV_H264,
                                                  AV_PIX_FMT_NONE },
 };
+
