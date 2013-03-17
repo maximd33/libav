@@ -24,12 +24,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
+#include <sys/types.h>
+#include <mfx/mfxdefs.h>
+
+#include "avcodec.h"
+#include "qsv.h"
+
 #include "libavutil/time.h"
 #include "h264.h"
-#include "qsv_h264.h"
-
-static av_qsv_config av_qsv_default_config;
-static av_qsv_allocators_space av_qsv_default_system_allocators;
 
 static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
 static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
@@ -48,222 +51,6 @@ static int qsv_nal_find_start_code(uint8_t *pb, size_t size)
         return 1;
 
     return 0;
-}
-
-static int qsv_dec_init(AVCodecContext *avctx)
-{
-    mfxStatus sts;
-    size_t current_offset = 6;
-    int i, header_size = 0;
-    unsigned char *current_position;
-    size_t current_size;
-
-    av_qsv_context *qsv               = avctx->priv_data;
-    av_qsv_space *qsv_decode          = qsv->dec_space;
-    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-
-    qsv->impl = qsv_config_context->impl_requested;
-
-    memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
-    qsv->ver.Major = AV_QSV_MSDK_VERSION_MAJOR;
-    qsv->ver.Minor = AV_QSV_MSDK_VERSION_MINOR;
-
-    sts = MFXInit(qsv->impl, &qsv->ver, &qsv->mfx_session);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    qsv_decode->m_mfxVideoParam.mfx.CodecId = MFX_CODEC_AVC;
-    qsv_decode->m_mfxVideoParam.IOPattern   = qsv_config_context->io_pattern;
-    qsv_decode->m_mfxVideoParam.AsyncDepth  = qsv_config_context->async_depth;
-
-    current_position = avctx->extradata;
-    current_size     = avctx->extradata_size;
-
-    if (!qsv_nal_find_start_code(current_position, current_size)) {
-        while (current_offset <= current_size) {
-            int current_nal_size = current_position[current_offset] << 8 |
-                                   current_position[current_offset + 1];
-            unsigned char nal_type = current_position[current_offset + 2] & 0x1F;
-
-            if (nal_type == NAL_SPS || nal_type == NAL_PPS) {
-                memcpy(&qsv_decode->p_buf[header_size], qsv_prefix_code,
-                       sizeof(qsv_prefix_code));
-                header_size += sizeof(qsv_prefix_code);
-                memcpy(&qsv_decode->p_buf[header_size],
-                       &current_position[current_offset + 2],
-                       current_nal_size);
-
-                // fix for PPS as it comes after SPS, so - last
-                if (nal_type == NAL_PPS) {
-                    /* fix of MFXVideoDECODE_DecodeHeader: needs one SLICE
-                     * to find, any SLICE */
-                    memcpy(&qsv_decode->p_buf[header_size + current_nal_size],
-                           qsv_slice_code, current_nal_size);
-                    header_size += sizeof(qsv_slice_code);
-                }
-            }
-
-            header_size    += current_nal_size;
-            current_offset += current_nal_size + 3;
-        }
-    } else {
-        memcpy(&qsv_decode->p_buf[0], avctx->extradata, avctx->extradata_size);
-        header_size = avctx->extradata_size;
-        memcpy(&qsv_decode->p_buf[header_size], qsv_slice_code,
-               sizeof(qsv_slice_code));
-        header_size += sizeof(qsv_slice_code);
-    }
-
-    qsv_decode->bs.Data       = qsv_decode->p_buf;
-    qsv_decode->bs.DataLength = header_size;
-    qsv_decode->bs.MaxLength  = qsv_decode->p_buf_max_size;
-
-    if (qsv_decode->bs.DataLength > qsv_decode->bs.MaxLength) {
-        av_log(avctx, AV_LOG_FATAL, "DataLength > MaxLength\n");
-        return -1;
-    }
-
-    sts = MFXVideoDECODE_DecodeHeader(qsv->mfx_session, &qsv_decode->bs,
-                                      &qsv_decode->m_mfxVideoParam);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    qsv_decode->bs.DataLength -= sizeof(qsv_slice_code);
-    qsv_decode->bs.DataFlag    = MFX_BITSTREAM_COMPLETE_FRAME;
-
-    memset(&qsv_decode->request, 0, sizeof(qsv_decode->request) * 2);
-    sts = MFXVideoDECODE_QueryIOSurf(qsv->mfx_session,
-                                     &qsv_decode->m_mfxVideoParam,
-                                     qsv_decode->request);
-    if (sts == MFX_WRN_PARTIAL_ACCELERATION)
-        sts = MFX_ERR_NONE;
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
-                                    qsv_config_context->async_depth +
-                                    qsv_config_context->additional_buffers,
-                                    AV_QSV_SURFACE_NUM);
-    if (qsv_decode->surface_num <= 0)
-        qsv_decode->surface_num = AV_QSV_SURFACE_NUM;
-
-    if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-        // as per non-opaque memory:
-        if (!qsv_config_context->allocators) {
-            av_log(avctx, AV_LOG_INFO,
-                   "Using default allocators for QSV decode\n");
-            ((av_qsv_config *)avctx->hwaccel_context)->allocators =
-                &av_qsv_default_system_allocators;
-        }
-
-        qsv_config_context->allocators->space = qsv_decode;
-
-        qsv_decode->request[0].NumFrameMin       = qsv_decode->surface_num;
-        qsv_decode->request[0].NumFrameSuggested = qsv_decode->surface_num;
-
-        qsv_decode->request[0].Type = MFX_MEMTYPE_EXTERNAL_FRAME |
-                                      MFX_MEMTYPE_FROM_DECODE;
-        qsv_decode->request[0].Type |= MFX_MEMTYPE_SYSTEM_MEMORY;
-
-        qsv_config_context->allocators->frame_alloc.Alloc(qsv_config_context->allocators,
-                                                          &qsv_decode->request[0],
-                                                          &qsv_decode->response);
-    }
-
-    for (i = 0; i < qsv_decode->surface_num; i++) {
-        qsv_decode->p_surfaces[i] = av_mallocz(sizeof(*qsv_decode->p_surfaces[i]));
-        if (!(qsv_decode->p_surfaces[i])) {
-            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
-            return AVERROR(ENOMEM);
-        }
-        memcpy(&(qsv_decode->p_surfaces[i]->Info),
-               &(qsv_decode->request[0].Info),
-               sizeof(qsv_decode->p_surfaces[i]->Info));
-
-        if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            sts = qsv_config_context->allocators->frame_alloc.Lock(qsv_config_context->allocators,
-                                                                   qsv_decode->response.mids[i],
-                                                                   &(qsv_decode->p_surfaces[i]->Data));
-            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        }
-    }
-
-    qsv_decode->sync_num = FFMIN(qsv_decode->surface_num, AV_QSV_SYNC_NUM);
-    for (i = 0; i < qsv_decode->sync_num; i++) {
-        qsv_decode->p_sync[i] = av_mallocz(sizeof(*qsv_decode->p_sync[i]));
-        if (!(qsv_decode->p_sync[i])) {
-            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
-            return AVERROR(ENOMEM);
-        }
-    }
-
-    memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(qsv_decode->ext_opaque_alloc));
-
-    if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_OPAQUE_MEMORY) {
-        qsv_decode->p_ext_params = (mfxExtBuffer *)&qsv_decode->ext_opaque_alloc;
-
-        qsv_decode->ext_opaque_alloc.Header.BufferId = MFX_EXTBUFF_OPAQUE_SURFACE_ALLOCATION;
-        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(qsv_decode->ext_opaque_alloc.Header.BufferSz);
-        qsv_decode->ext_opaque_alloc.Out.Surfaces    = qsv_decode->p_surfaces;
-        qsv_decode->ext_opaque_alloc.Out.NumSurface  = qsv_decode->surface_num;
-        qsv_decode->ext_opaque_alloc.Out.Type        = qsv_decode->request[0].Type;
-
-        qsv_decode->m_mfxVideoParam.ExtParam    = &qsv_decode->p_ext_params;
-        qsv_decode->m_mfxVideoParam.NumExtParam = 1;
-    }
-
-    sts = MFXVideoDECODE_Init(qsv->mfx_session, &qsv_decode->m_mfxVideoParam);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-    qsv_decode->is_init_done = 1;
-    return 0;
-}
-
-static av_cold int qsv_decode_init(AVCodecContext *avctx)
-{
-    av_qsv_space *qsv_decode;
-    av_qsv_context *qsv;
-    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-
-    if (!qsv_config_context) {
-        av_log(avctx, AV_LOG_INFO,
-               "Using default config for QSV decode\n");
-        avctx->hwaccel_context = qsv_config_context = &av_qsv_default_config;
-    } else {
-        if (qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
-            qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            avpriv_report_missing_feature(avctx,
-                                          "Memory type other than "
-                                          "MFX_IOPATTERN_OUT_OPAQUE_MEMORY / "
-                                          "MFX_IOPATTERN_OUT_SYSTEM_MEMORY");
-            return AVERROR_PATCHWELCOME;
-        }
-    }
-
-    qsv = av_mallocz(sizeof(*qsv));
-    if (!qsv)
-        return AVERROR(ENOMEM);
-
-    qsv_decode = av_mallocz(sizeof(*qsv_decode));
-    if (!qsv_decode) {
-        av_free(qsv);
-        return AVERROR(ENOMEM);
-    }
-
-    qsv_decode->p_buf_max_size = AV_QSV_BUF_SIZE_DEFAULT;
-    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size,
-                                                 sizeof(uint8_t));
-    if (!qsv_decode->p_buf) {
-        av_free(qsv_decode);
-        av_free(qsv);
-        return AVERROR(ENOMEM);
-    }
-
-    qsv->dec_space   = qsv_decode;
-    avctx->priv_data = qsv;
-
-    av_qsv_add_context_usage(qsv, HAVE_THREADS ?
-                             qsv_config_context->usage_threaded :
-                             HAVE_THREADS);
-
-    return qsv_dec_init(avctx);
 }
 
 static av_cold int qsv_decode_end(AVCodecContext *avctx)
@@ -838,6 +625,222 @@ static av_qsv_allocators_space av_qsv_default_system_allocators = {
         .Free   = qsv_mem_buffer_free,
     },
 };
+
+static int qsv_dec_init(AVCodecContext *avctx)
+{
+    mfxStatus sts;
+    size_t current_offset = 6;
+    int i, header_size = 0;
+    unsigned char *current_position;
+    size_t current_size;
+
+    av_qsv_context *qsv               = avctx->priv_data;
+    av_qsv_space *qsv_decode          = qsv->dec_space;
+    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
+
+    qsv->impl = qsv_config_context->impl_requested;
+
+    memset(&qsv->mfx_session, 0, sizeof(qsv->mfx_session));
+    qsv->ver.Major = AV_QSV_MSDK_VERSION_MAJOR;
+    qsv->ver.Minor = AV_QSV_MSDK_VERSION_MINOR;
+
+    sts = MFXInit(qsv->impl, &qsv->ver, &qsv->mfx_session);
+    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+    qsv_decode->m_mfxVideoParam.mfx.CodecId = MFX_CODEC_AVC;
+    qsv_decode->m_mfxVideoParam.IOPattern   = qsv_config_context->io_pattern;
+    qsv_decode->m_mfxVideoParam.AsyncDepth  = qsv_config_context->async_depth;
+
+    current_position = avctx->extradata;
+    current_size     = avctx->extradata_size;
+
+    if (!qsv_nal_find_start_code(current_position, current_size)) {
+        while (current_offset <= current_size) {
+            int current_nal_size = current_position[current_offset] << 8 |
+                                   current_position[current_offset + 1];
+            unsigned char nal_type = current_position[current_offset + 2] & 0x1F;
+
+            if (nal_type == NAL_SPS || nal_type == NAL_PPS) {
+                memcpy(&qsv_decode->p_buf[header_size], qsv_prefix_code,
+                       sizeof(qsv_prefix_code));
+                header_size += sizeof(qsv_prefix_code);
+                memcpy(&qsv_decode->p_buf[header_size],
+                       &current_position[current_offset + 2],
+                       current_nal_size);
+
+                // fix for PPS as it comes after SPS, so - last
+                if (nal_type == NAL_PPS) {
+                    /* fix of MFXVideoDECODE_DecodeHeader: needs one SLICE
+                     * to find, any SLICE */
+                    memcpy(&qsv_decode->p_buf[header_size + current_nal_size],
+                           qsv_slice_code, current_nal_size);
+                    header_size += sizeof(qsv_slice_code);
+                }
+            }
+
+            header_size    += current_nal_size;
+            current_offset += current_nal_size + 3;
+        }
+    } else {
+        memcpy(&qsv_decode->p_buf[0], avctx->extradata, avctx->extradata_size);
+        header_size = avctx->extradata_size;
+        memcpy(&qsv_decode->p_buf[header_size], qsv_slice_code,
+               sizeof(qsv_slice_code));
+        header_size += sizeof(qsv_slice_code);
+    }
+
+    qsv_decode->bs.Data       = qsv_decode->p_buf;
+    qsv_decode->bs.DataLength = header_size;
+    qsv_decode->bs.MaxLength  = qsv_decode->p_buf_max_size;
+
+    if (qsv_decode->bs.DataLength > qsv_decode->bs.MaxLength) {
+        av_log(avctx, AV_LOG_FATAL, "DataLength > MaxLength\n");
+        return -1;
+    }
+
+    sts = MFXVideoDECODE_DecodeHeader(qsv->mfx_session, &qsv_decode->bs,
+                                      &qsv_decode->m_mfxVideoParam);
+    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+    qsv_decode->bs.DataLength -= sizeof(qsv_slice_code);
+    qsv_decode->bs.DataFlag    = MFX_BITSTREAM_COMPLETE_FRAME;
+
+    memset(&qsv_decode->request, 0, sizeof(qsv_decode->request) * 2);
+    sts = MFXVideoDECODE_QueryIOSurf(qsv->mfx_session,
+                                     &qsv_decode->m_mfxVideoParam,
+                                     qsv_decode->request);
+    if (sts == MFX_WRN_PARTIAL_ACCELERATION)
+        sts = MFX_ERR_NONE;
+    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+    qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
+                                    qsv_config_context->async_depth +
+                                    qsv_config_context->additional_buffers,
+                                    AV_QSV_SURFACE_NUM);
+    if (qsv_decode->surface_num <= 0)
+        qsv_decode->surface_num = AV_QSV_SURFACE_NUM;
+
+    if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+        // as per non-opaque memory:
+        if (!qsv_config_context->allocators) {
+            av_log(avctx, AV_LOG_INFO,
+                   "Using default allocators for QSV decode\n");
+            ((av_qsv_config *)avctx->hwaccel_context)->allocators =
+                &av_qsv_default_system_allocators;
+        }
+
+        qsv_config_context->allocators->space = qsv_decode;
+
+        qsv_decode->request[0].NumFrameMin       = qsv_decode->surface_num;
+        qsv_decode->request[0].NumFrameSuggested = qsv_decode->surface_num;
+
+        qsv_decode->request[0].Type = MFX_MEMTYPE_EXTERNAL_FRAME |
+                                      MFX_MEMTYPE_FROM_DECODE;
+        qsv_decode->request[0].Type |= MFX_MEMTYPE_SYSTEM_MEMORY;
+
+        qsv_config_context->allocators->frame_alloc.Alloc(qsv_config_context->allocators,
+                                                          &qsv_decode->request[0],
+                                                          &qsv_decode->response);
+    }
+
+    for (i = 0; i < qsv_decode->surface_num; i++) {
+        qsv_decode->p_surfaces[i] = av_mallocz(sizeof(*qsv_decode->p_surfaces[i]));
+        if (!(qsv_decode->p_surfaces[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
+        memcpy(&(qsv_decode->p_surfaces[i]->Info),
+               &(qsv_decode->request[0].Info),
+               sizeof(qsv_decode->p_surfaces[i]->Info));
+
+        if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+            sts = qsv_config_context->allocators->frame_alloc.Lock(qsv_config_context->allocators,
+                                                                   qsv_decode->response.mids[i],
+                                                                   &(qsv_decode->p_surfaces[i]->Data));
+            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        }
+    }
+
+    qsv_decode->sync_num = FFMIN(qsv_decode->surface_num, AV_QSV_SYNC_NUM);
+    for (i = 0; i < qsv_decode->sync_num; i++) {
+        qsv_decode->p_sync[i] = av_mallocz(sizeof(*qsv_decode->p_sync[i]));
+        if (!(qsv_decode->p_sync[i])) {
+            AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
+            return AVERROR(ENOMEM);
+        }
+    }
+
+    memset(&qsv_decode->ext_opaque_alloc, 0, sizeof(qsv_decode->ext_opaque_alloc));
+
+    if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_OPAQUE_MEMORY) {
+        qsv_decode->p_ext_params = (mfxExtBuffer *)&qsv_decode->ext_opaque_alloc;
+
+        qsv_decode->ext_opaque_alloc.Header.BufferId = MFX_EXTBUFF_OPAQUE_SURFACE_ALLOCATION;
+        qsv_decode->ext_opaque_alloc.Header.BufferSz = sizeof(qsv_decode->ext_opaque_alloc.Header.BufferSz);
+        qsv_decode->ext_opaque_alloc.Out.Surfaces    = qsv_decode->p_surfaces;
+        qsv_decode->ext_opaque_alloc.Out.NumSurface  = qsv_decode->surface_num;
+        qsv_decode->ext_opaque_alloc.Out.Type        = qsv_decode->request[0].Type;
+
+        qsv_decode->m_mfxVideoParam.ExtParam    = &qsv_decode->p_ext_params;
+        qsv_decode->m_mfxVideoParam.NumExtParam = 1;
+    }
+
+    sts = MFXVideoDECODE_Init(qsv->mfx_session, &qsv_decode->m_mfxVideoParam);
+    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+    qsv_decode->is_init_done = 1;
+    return 0;
+}
+
+static av_cold int qsv_decode_init(AVCodecContext *avctx)
+{
+    av_qsv_space *qsv_decode;
+    av_qsv_context *qsv;
+    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
+
+    if (!qsv_config_context) {
+        av_log(avctx, AV_LOG_INFO,
+               "Using default config for QSV decode\n");
+        avctx->hwaccel_context = qsv_config_context = &av_qsv_default_config;
+    } else {
+        if (qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_OPAQUE_MEMORY &&
+            qsv_config_context->io_pattern != MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+            avpriv_report_missing_feature(avctx,
+                                          "Memory type other than "
+                                          "MFX_IOPATTERN_OUT_OPAQUE_MEMORY / "
+                                          "MFX_IOPATTERN_OUT_SYSTEM_MEMORY");
+            return AVERROR_PATCHWELCOME;
+        }
+    }
+
+    qsv = av_mallocz(sizeof(*qsv));
+    if (!qsv)
+        return AVERROR(ENOMEM);
+
+    qsv_decode = av_mallocz(sizeof(*qsv_decode));
+    if (!qsv_decode) {
+        av_free(qsv);
+        return AVERROR(ENOMEM);
+    }
+
+    qsv_decode->p_buf_max_size = AV_QSV_BUF_SIZE_DEFAULT;
+    qsv_decode->p_buf          = av_malloc_array(qsv_decode->p_buf_max_size,
+                                                 sizeof(uint8_t));
+    if (!qsv_decode->p_buf) {
+        av_free(qsv_decode);
+        av_free(qsv);
+        return AVERROR(ENOMEM);
+    }
+
+    qsv->dec_space   = qsv_decode;
+    avctx->priv_data = qsv;
+
+    av_qsv_add_context_usage(qsv, HAVE_THREADS ?
+                             qsv_config_context->usage_threaded :
+                             HAVE_THREADS);
+
+    return qsv_dec_init(avctx);
+}
 
 AVCodec ff_h264_qsv_decoder = {
     .name         = "h264_qsv",
