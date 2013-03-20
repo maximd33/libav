@@ -35,7 +35,7 @@
 #include "h264.h"
 
 static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
-static const uint8_t qsv_slice_code[] = { 0x00, 0x00, 0x01, 0x65 };
+static const uint8_t qsv_slice_code[]  = { 0x00, 0x00, 0x01, 0x65 };
 
 static int qsv_nal_find_start_code(uint8_t *pb, size_t size)
 {
@@ -111,18 +111,18 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
     mfxStatus sts;
     av_qsv_context *qsv               = avctx->priv_data;
     av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    av_qsv_space *qsv_decode          = qsv->dec_space;
+    av_qsv_space *qsv_decode = qsv->dec_space;
     av_qsv_stage *new_stage;
     av_qsv_list *qsv_atom, *pipe;
     uint8_t *current_position = avpkt->data;
     int current_size          = avpkt->size;
-    size_t frame_length       = 0, current_offset = 2;
-    int *got_picture_ptr      = data_size;
-    int frame_processed       = 0, surface_idx = 0, sync_idx = 0;
-    int ret_value             = 1, current_nal_size;
+    size_t frame_length = 0, current_offset = 2;
+    int *got_picture_ptr = data_size;
+    int frame_processed = 0, surface_idx = 0, sync_idx = 0;
+    int ret_value = 1, current_nal_size;
     unsigned char nal_type;
     mfxBitstream *input_bs = NULL;
-    AVFrame *picture       = data;
+    AVFrame *picture = data;
 
     *got_picture_ptr = 0;
 
@@ -138,7 +138,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         while (current_offset <= current_size) {
             current_nal_size = (current_position[current_offset - 2] << 24 |
                                 current_position[current_offset - 1] << 16 |
-                                current_position[current_offset] << 8 |
+                                current_position[current_offset]     <<  8 |
                                 current_position[current_offset + 1]) - 1;
             nal_type = current_position[current_offset + 2] & 0x1F;
 
@@ -177,7 +177,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
 
         sts = MFX_ERR_NONE;
         // ignore warnings, where warnings >0 , and not error codes <0
-        while (sts >= MFX_ERR_NONE ||
+        while (sts >= MFX_ERR_NONE         ||
                sts == MFX_ERR_MORE_SURFACE ||
                sts == MFX_WRN_DEVICE_BUSY) {
             if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
@@ -215,7 +215,7 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                                                   &new_stage->out.p_surface,
                                                   qsv_decode->p_sync[sync_idx]);
 
-            if (sts <= MFX_ERR_NONE &&
+            if (sts <= MFX_ERR_NONE        &&
                 sts != MFX_WRN_DEVICE_BUSY &&
                 sts != MFX_WRN_VIDEO_PARAM_CHANGED) {
                 new_stage->type         = AV_QSV_DECODE;
@@ -304,10 +304,10 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
         picture->pkt_pts = avpkt->pts;
         picture->pts     = avpkt->pts;
 
-        picture->repeat_pict = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
-                               MFX_PICSTRUCT_FIELD_REPEATED;
-        picture->top_field_first = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
-                                   MFX_PICSTRUCT_FIELD_TFF;
+        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_TFF;
         picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
                                       MFX_PICSTRUCT_PROGRESSIVE);
 
@@ -352,9 +352,9 @@ static mfxStatus qsv_mem_frame_alloc(mfxHDL pthis,
                                      mfxFrameAllocResponse *response)
 {
     mfxStatus sts;
-    mfxU32 numAllocated                 = 0, nbytes;
-    mfxU32 width                        = FFALIGN(request->Info.Width, 32);
-    mfxU32 height                       = FFALIGN(request->Info.Height, 32);
+    mfxU32 numAllocated = 0, nbytes;
+    mfxU32 width  = FFALIGN(request->Info.Width,  32);
+    mfxU32 height = FFALIGN(request->Info.Height, 32);
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
     av_qsv_alloc_frame *fs;
 
@@ -479,7 +479,7 @@ static mfxStatus qsv_mem_frame_lock(mfxHDL pthis, mfxMemId mid, mfxFrameData *pt
 static mfxStatus qsv_mem_frame_unlock(mfxHDL pthis, mfxMemId mid, mfxFrameData *ptr)
 {
     av_qsv_allocators_space *this_alloc = (av_qsv_allocators_space *)pthis;
-    mfxStatus sts                       = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
+    mfxStatus sts = this_alloc->buffer_alloc.Unlock(this_alloc->buffer_alloc.pthis, mid);
 
     if (sts != MFX_ERR_NONE)
         return sts;
@@ -853,5 +853,5 @@ AVCodec ff_h264_qsv_decoder = {
     .flush        = qsv_flush_dpb,
     .long_name    = NULL_IF_CONFIG_SMALL("H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (Intel QSV acceleration)"),
     .pix_fmts     = (const enum PixelFormat[]) { AV_PIX_FMT_QSV_H264,
-        AV_PIX_FMT_NONE },
+                                                 AV_PIX_FMT_NONE },
 };
