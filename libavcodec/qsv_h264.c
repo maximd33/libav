@@ -34,319 +34,6 @@
 #include "libavutil/time.h"
 #include "h264.h"
 
-static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
-static const uint8_t qsv_slice_code[]  = { 0x00, 0x00, 0x01, 0x65 };
-
-static int qsv_nal_find_start_code(uint8_t *pb, size_t size)
-{
-    if (size < 4)
-        return 0;
-
-    while ((size >= 4) && ((0 != pb[0]) || (0 != pb[1]) || (1 != pb[2]))) {
-        pb   += 1;
-        size -= 1;
-    }
-
-    if (size >= 4)
-        return 1;
-
-    return 0;
-}
-
-static av_cold int qsv_decode_end(AVCodecContext *avctx)
-{
-    mfxStatus sts;
-    av_qsv_context *qsv               = avctx->priv_data;
-    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    int i;
-
-    if (qsv) {
-        av_qsv_space *qsv_decode = qsv->dec_space;
-        if (qsv_decode && qsv_decode->is_init_done) {
-            // todo: change to AV_LOG_INFO
-            av_log(avctx, AV_LOG_QUIET,
-                   "qsv_decode report done, max_surfaces: %u/%u , max_syncs: %u/%u\n",
-                   qsv_decode->surface_num_max_used,
-                   qsv_decode->surface_num,
-                   qsv_decode->sync_num_max_used,
-                   qsv_decode->sync_num);
-        }
-
-        if (qsv_config_context &&
-            qsv_config_context->io_pattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            if (qsv_config_context->allocators) {
-                sts = qsv_config_context->allocators->frame_alloc.Free(qsv_config_context->allocators,
-                                                                       &qsv_decode->response);
-                AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-            } else
-                av_log(avctx, AV_LOG_FATAL,
-                       "No QSV allocators found for cleanup\n");
-        }
-        // closing the own resources
-        av_freep(&qsv_decode->p_buf);
-
-        for (i = 0; i < qsv_decode->surface_num; i++)
-            av_freep(&qsv_decode->p_surfaces[i]);
-
-        qsv_decode->surface_num = 0;
-
-        for (i = 0; i < qsv_decode->sync_num; i++)
-            av_freep(&qsv_decode->p_sync[i]);
-
-        qsv_decode->sync_num     = 0;
-        qsv_decode->is_init_done = 0;
-
-        av_freep(&qsv->dec_space);
-
-        // closing common stuff
-        av_qsv_context_clean(qsv);
-    }
-
-    return 0;
-}
-
-static int qsv_decode_frame(AVCodecContext *avctx, void *data,
-                            int *data_size, AVPacket *avpkt)
-{
-    mfxStatus sts;
-    av_qsv_context *qsv               = avctx->priv_data;
-    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
-    av_qsv_space *qsv_decode = qsv->dec_space;
-    av_qsv_stage *new_stage;
-    av_qsv_list *qsv_atom, *pipe;
-    uint8_t *current_position = avpkt->data;
-    int current_size          = avpkt->size;
-    size_t frame_length = 0, current_offset = 2;
-    int *got_picture_ptr = data_size;
-    int frame_processed = 0, surface_idx = 0, sync_idx = 0;
-    int ret_value = 1, current_nal_size;
-    unsigned char nal_type;
-    mfxBitstream *input_bs = NULL;
-    AVFrame *picture = data;
-
-    *got_picture_ptr = 0;
-
-    if (qsv_decode->bs.DataOffset + qsv_decode->bs.DataLength + current_size >
-        qsv_decode->bs.MaxLength) {
-        memmove(&qsv_decode->bs.Data[0],
-                qsv_decode->bs.Data + qsv_decode->bs.DataOffset,
-                qsv_decode->bs.DataLength);
-        qsv_decode->bs.DataOffset = 0;
-    }
-
-    if (current_size) {
-        while (current_offset <= current_size) {
-            current_nal_size = (current_position[current_offset - 2] << 24 |
-                                current_position[current_offset - 1] << 16 |
-                                current_position[current_offset]     <<  8 |
-                                current_position[current_offset + 1]) - 1;
-            nal_type = current_position[current_offset + 2] & 0x1F;
-
-            frame_length += current_nal_size;
-
-            memcpy(&qsv_decode->bs.Data[0] +
-                   qsv_decode->bs.DataLength +
-                   qsv_decode->bs.DataOffset, qsv_prefix_code,
-                   sizeof(qsv_prefix_code));
-            qsv_decode->bs.DataLength += sizeof(qsv_prefix_code);
-            memcpy(&qsv_decode->bs.Data[0] +
-                   qsv_decode->bs.DataLength +
-                   qsv_decode->bs.DataOffset,
-                   &current_position[current_offset + 2],
-                   current_nal_size + 1);
-            qsv_decode->bs.DataLength += current_nal_size + 1;
-
-            current_offset += current_nal_size + 5;
-        }
-
-        if (qsv_decode->bs.DataLength > qsv_decode->bs.MaxLength) {
-            av_log(avctx, AV_LOG_FATAL, "DataLength > MaxLength\n");
-            return -1;
-        }
-    }
-
-    if (frame_length || !current_size) {
-        qsv_decode->bs.TimeStamp = avpkt->pts;
-
-        if (qsv_config_context->dts_need) {
-            //not a drain
-            if (current_size || qsv_decode->bs.DataLength)
-                av_qsv_dts_ordered_insert(qsv, 0, 0,
-                                          qsv_decode->bs.TimeStamp, 0);
-        }
-
-        sts = MFX_ERR_NONE;
-        // ignore warnings, where warnings >0 , and not error codes <0
-        while (sts >= MFX_ERR_NONE         ||
-               sts == MFX_ERR_MORE_SURFACE ||
-               sts == MFX_WRN_DEVICE_BUSY) {
-            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
-                surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
-                                                      &qsv_decode->request[0].Info,
-                                                      QSV_PART_ANY);
-                if (surface_idx == -1) {
-                    *got_picture_ptr = 0;
-                    return 0;
-                }
-            }
-
-            if (sts == MFX_WRN_DEVICE_BUSY)
-                av_usleep(10000);
-
-            sync_idx = av_qsv_get_free_sync(qsv_decode, qsv);
-            if (sync_idx == -1) {
-                *got_picture_ptr = 0;
-                return 0;
-            }
-            new_stage = av_qsv_stage_init();
-            if (!new_stage) {
-                av_log(avctx, AV_LOG_FATAL, "Could not allocate stage\n");
-                return -1;
-            }
-            input_bs = NULL;
-            // if to drain last ones
-            if (current_size || qsv_decode->bs.DataLength)
-                input_bs = &qsv_decode->bs;
-
-            // Decode a frame asynchronously (returns immediately)
-            // very first IDR / SLICE should be with SPS/PPS
-            sts = MFXVideoDECODE_DecodeFrameAsync(qsv->mfx_session, input_bs,
-                                                  qsv_decode->p_surfaces[surface_idx],
-                                                  &new_stage->out.p_surface,
-                                                  qsv_decode->p_sync[sync_idx]);
-
-            if (sts <= MFX_ERR_NONE        &&
-                sts != MFX_WRN_DEVICE_BUSY &&
-                sts != MFX_WRN_VIDEO_PARAM_CHANGED) {
-                new_stage->type         = AV_QSV_DECODE;
-                new_stage->in.p_bs      = input_bs;
-                new_stage->in.p_surface = qsv_decode->p_surfaces[surface_idx];
-
-                /* see MFXVideoDECODE_DecodeFrameAsync, will be filled
-                 * from there, if output */
-                new_stage->out.p_sync = qsv_decode->p_sync[sync_idx];
-                if (!qsv_config_context->resource_free ||
-                    qsv_config_context->usage_threaded) {
-                    pipe = av_qsv_list_init(HAVE_THREADS ?
-                                            qsv_config_context->usage_threaded :
-                                            HAVE_THREADS);
-                    av_qsv_add_stage(pipe, new_stage,
-                                     HAVE_THREADS ?
-                                     qsv_config_context->usage_threaded :
-                                     HAVE_THREADS);
-
-                    av_qsv_list_add(qsv->pipes, pipe);
-                    qsv_atom = pipe;
-                } else {
-                    qsv_atom = NULL;
-                }
-
-                /* Usage for forced decode sync and results, can be avoided if
-                 * sync done by next stage. Also note wait time for Sync and
-                 * possible usage with MFX_WRN_IN_EXECUTION check. */
-                if (qsv_config_context->sync_need) {
-                    sts = MFXVideoCORE_SyncOperation(qsv->mfx_session,
-                                                     *new_stage->out.p_sync,
-                                                     qsv_config_context->sync_need);
-                    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-
-                    // no need to wait more -> force off
-                    *new_stage->out.p_sync = 0;
-                    new_stage->out.p_sync  = NULL;
-                }
-
-                sts = MFX_ERR_NONE;
-                break;
-            }
-            av_qsv_stage_clean(&new_stage);
-
-            /* Can be because of:
-             * - runtime situation:
-             * - drain procedure:
-             * At the end of the bitstream, the application continuously calls
-             * the MFXVideoDECODE_DecodeFrameAsync function with a NULL
-             * bitstream pointer to drain any remaining frames cached within
-             * the Intel Media SDK decoder, until the function returns
-             * MFX_ERR_MORE_DATA. */
-            if (sts == MFX_ERR_MORE_DATA) {
-                // not a drain
-                if (current_size) {
-                    *got_picture_ptr = 0;
-                    return avpkt->size;
-                }
-                // drain
-                break;
-            }
-
-            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_MORE_SURFACE)
-                continue;
-
-            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
-        }
-
-        frame_processed = 1;
-    }
-
-    if (frame_processed) {
-        if (current_size) {
-            *got_picture_ptr = 1;
-            ret_value        = avpkt->size;
-        } else {
-            if (sts != MFX_ERR_MORE_DATA) {
-                *got_picture_ptr = 1;
-                ret_value        = avpkt->size;
-            } else {
-                *got_picture_ptr = 0;
-                return 0;
-            }
-        }
-
-        picture->pkt_pts = avpkt->pts;
-        picture->pts     = avpkt->pts;
-
-        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
-                                    MFX_PICSTRUCT_FIELD_REPEATED;
-        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
-                                    MFX_PICSTRUCT_FIELD_TFF;
-        picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
-                                      MFX_PICSTRUCT_PROGRESSIVE);
-
-        // since we do not know it yet from MSDK, let's do just a simple way for now
-        picture->key_frame = (avctx->frame_number == 0) ? 1 : 0;
-
-        if (qsv_decode->m_mfxVideoParam.IOPattern ==
-            MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
-            picture->data[0]     = new_stage->out.p_surface->Data.Y;
-            picture->data[1]     = new_stage->out.p_surface->Data.VU;
-            picture->linesize[0] = new_stage->out.p_surface->Info.Width;
-            picture->linesize[1] = new_stage->out.p_surface->Info.Width;
-        } else {
-            picture->data[0]     = 0;
-            picture->data[1]     = 0;
-            picture->linesize[0] = 0;
-            picture->linesize[1] = 0;
-        }
-
-        picture->data[2]     = qsv_atom;
-        picture->linesize[2] = 0;
-
-        // assuming resource_free approach
-        if (!qsv_atom)
-            av_qsv_stage_clean(&new_stage);
-    }
-    return ret_value;
-}
-
-static void qsv_flush_dpb(AVCodecContext *avctx)
-{
-    av_qsv_context *qsv      = avctx->priv_data;
-    av_qsv_space *qsv_decode = qsv->dec_space;
-
-    qsv_decode->bs.DataOffset = 0;
-    qsv_decode->bs.DataLength = 0;
-    qsv_decode->bs.MaxLength  = qsv_decode->p_buf_max_size;
-}
-
 static mfxStatus qsv_mem_frame_alloc(mfxHDL pthis,
                                      mfxFrameAllocRequest *request,
                                      mfxFrameAllocResponse *response)
@@ -626,6 +313,25 @@ static av_qsv_allocators_space av_qsv_default_system_allocators = {
     },
 };
 
+static const uint8_t qsv_prefix_code[] = { 0x00, 0x00, 0x00, 0x01 };
+static const uint8_t qsv_slice_code[]  = { 0x00, 0x00, 0x01, 0x65 };
+
+static int qsv_nal_find_start_code(uint8_t *pb, size_t size)
+{
+    if (size < 4)
+        return 0;
+
+    while ((size >= 4) && ((0 != pb[0]) || (0 != pb[1]) || (1 != pb[2]))) {
+        pb   += 1;
+        size -= 1;
+    }
+
+    if (size >= 4)
+        return 1;
+
+    return 0;
+}
+
 static int qsv_dec_init(AVCodecContext *avctx)
 {
     mfxStatus sts;
@@ -840,6 +546,300 @@ static av_cold int qsv_decode_init(AVCodecContext *avctx)
                              HAVE_THREADS);
 
     return qsv_dec_init(avctx);
+}
+
+static int qsv_decode_frame(AVCodecContext *avctx, void *data,
+                            int *data_size, AVPacket *avpkt)
+{
+    mfxStatus sts;
+    av_qsv_context *qsv               = avctx->priv_data;
+    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
+    av_qsv_space *qsv_decode = qsv->dec_space;
+    av_qsv_stage *new_stage;
+    av_qsv_list *qsv_atom, *pipe;
+    uint8_t *current_position = avpkt->data;
+    int current_size          = avpkt->size;
+    size_t frame_length = 0, current_offset = 2;
+    int *got_picture_ptr = data_size;
+    int frame_processed = 0, surface_idx = 0, sync_idx = 0;
+    int ret_value = 1, current_nal_size;
+    unsigned char nal_type;
+    mfxBitstream *input_bs = NULL;
+    AVFrame *picture = data;
+
+    *got_picture_ptr = 0;
+
+    if (qsv_decode->bs.DataOffset + qsv_decode->bs.DataLength + current_size >
+        qsv_decode->bs.MaxLength) {
+        memmove(&qsv_decode->bs.Data[0],
+                qsv_decode->bs.Data + qsv_decode->bs.DataOffset,
+                qsv_decode->bs.DataLength);
+        qsv_decode->bs.DataOffset = 0;
+    }
+
+    if (current_size) {
+        while (current_offset <= current_size) {
+            current_nal_size = (current_position[current_offset - 2] << 24 |
+                                current_position[current_offset - 1] << 16 |
+                                current_position[current_offset]     <<  8 |
+                                current_position[current_offset + 1]) - 1;
+            nal_type = current_position[current_offset + 2] & 0x1F;
+
+            frame_length += current_nal_size;
+
+            memcpy(&qsv_decode->bs.Data[0] +
+                   qsv_decode->bs.DataLength +
+                   qsv_decode->bs.DataOffset, qsv_prefix_code,
+                   sizeof(qsv_prefix_code));
+            qsv_decode->bs.DataLength += sizeof(qsv_prefix_code);
+            memcpy(&qsv_decode->bs.Data[0] +
+                   qsv_decode->bs.DataLength +
+                   qsv_decode->bs.DataOffset,
+                   &current_position[current_offset + 2],
+                   current_nal_size + 1);
+            qsv_decode->bs.DataLength += current_nal_size + 1;
+
+            current_offset += current_nal_size + 5;
+        }
+
+        if (qsv_decode->bs.DataLength > qsv_decode->bs.MaxLength) {
+            av_log(avctx, AV_LOG_FATAL, "DataLength > MaxLength\n");
+            return -1;
+        }
+    }
+
+    if (frame_length || !current_size) {
+        qsv_decode->bs.TimeStamp = avpkt->pts;
+
+        if (qsv_config_context->dts_need) {
+            //not a drain
+            if (current_size || qsv_decode->bs.DataLength)
+                av_qsv_dts_ordered_insert(qsv, 0, 0,
+                                          qsv_decode->bs.TimeStamp, 0);
+        }
+
+        sts = MFX_ERR_NONE;
+        // ignore warnings, where warnings >0 , and not error codes <0
+        while (sts >= MFX_ERR_NONE         ||
+               sts == MFX_ERR_MORE_SURFACE ||
+               sts == MFX_WRN_DEVICE_BUSY) {
+            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_NONE) {
+                surface_idx = av_qsv_get_free_surface(qsv_decode, qsv,
+                                                      &qsv_decode->request[0].Info,
+                                                      QSV_PART_ANY);
+                if (surface_idx == -1) {
+                    *got_picture_ptr = 0;
+                    return 0;
+                }
+            }
+
+            if (sts == MFX_WRN_DEVICE_BUSY)
+                av_usleep(10000);
+
+            sync_idx = av_qsv_get_free_sync(qsv_decode, qsv);
+            if (sync_idx == -1) {
+                *got_picture_ptr = 0;
+                return 0;
+            }
+            new_stage = av_qsv_stage_init();
+            if (!new_stage) {
+                av_log(avctx, AV_LOG_FATAL, "Could not allocate stage\n");
+                return -1;
+            }
+            input_bs = NULL;
+            // if to drain last ones
+            if (current_size || qsv_decode->bs.DataLength)
+                input_bs = &qsv_decode->bs;
+
+            // Decode a frame asynchronously (returns immediately)
+            // very first IDR / SLICE should be with SPS/PPS
+            sts = MFXVideoDECODE_DecodeFrameAsync(qsv->mfx_session, input_bs,
+                                                  qsv_decode->p_surfaces[surface_idx],
+                                                  &new_stage->out.p_surface,
+                                                  qsv_decode->p_sync[sync_idx]);
+
+            if (sts <= MFX_ERR_NONE        &&
+                sts != MFX_WRN_DEVICE_BUSY &&
+                sts != MFX_WRN_VIDEO_PARAM_CHANGED) {
+                new_stage->type         = AV_QSV_DECODE;
+                new_stage->in.p_bs      = input_bs;
+                new_stage->in.p_surface = qsv_decode->p_surfaces[surface_idx];
+
+                /* see MFXVideoDECODE_DecodeFrameAsync, will be filled
+                 * from there, if output */
+                new_stage->out.p_sync = qsv_decode->p_sync[sync_idx];
+                if (!qsv_config_context->resource_free ||
+                    qsv_config_context->usage_threaded) {
+                    pipe = av_qsv_list_init(HAVE_THREADS ?
+                                            qsv_config_context->usage_threaded :
+                                            HAVE_THREADS);
+                    av_qsv_add_stage(pipe, new_stage,
+                                     HAVE_THREADS ?
+                                     qsv_config_context->usage_threaded :
+                                     HAVE_THREADS);
+
+                    av_qsv_list_add(qsv->pipes, pipe);
+                    qsv_atom = pipe;
+                } else {
+                    qsv_atom = NULL;
+                }
+
+                /* Usage for forced decode sync and results, can be avoided if
+                 * sync done by next stage. Also note wait time for Sync and
+                 * possible usage with MFX_WRN_IN_EXECUTION check. */
+                if (qsv_config_context->sync_need) {
+                    sts = MFXVideoCORE_SyncOperation(qsv->mfx_session,
+                                                     *new_stage->out.p_sync,
+                                                     qsv_config_context->sync_need);
+                    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+
+                    // no need to wait more -> force off
+                    *new_stage->out.p_sync = 0;
+                    new_stage->out.p_sync  = NULL;
+                }
+
+                sts = MFX_ERR_NONE;
+                break;
+            }
+            av_qsv_stage_clean(&new_stage);
+
+            /* Can be because of:
+             * - runtime situation:
+             * - drain procedure:
+             * At the end of the bitstream, the application continuously calls
+             * the MFXVideoDECODE_DecodeFrameAsync function with a NULL
+             * bitstream pointer to drain any remaining frames cached within
+             * the Intel Media SDK decoder, until the function returns
+             * MFX_ERR_MORE_DATA. */
+            if (sts == MFX_ERR_MORE_DATA) {
+                // not a drain
+                if (current_size) {
+                    *got_picture_ptr = 0;
+                    return avpkt->size;
+                }
+                // drain
+                break;
+            }
+
+            if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_MORE_SURFACE)
+                continue;
+
+            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+        }
+
+        frame_processed = 1;
+    }
+
+    if (frame_processed) {
+        if (current_size) {
+            *got_picture_ptr = 1;
+            ret_value        = avpkt->size;
+        } else {
+            if (sts != MFX_ERR_MORE_DATA) {
+                *got_picture_ptr = 1;
+                ret_value        = avpkt->size;
+            } else {
+                *got_picture_ptr = 0;
+                return 0;
+            }
+        }
+
+        picture->pkt_pts = avpkt->pts;
+        picture->pts     = avpkt->pts;
+
+        picture->repeat_pict      = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_REPEATED;
+        picture->top_field_first  = qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct   &
+                                    MFX_PICSTRUCT_FIELD_TFF;
+        picture->interlaced_frame = !(qsv_decode->m_mfxVideoParam.mfx.FrameInfo.PicStruct &
+                                      MFX_PICSTRUCT_PROGRESSIVE);
+
+        // since we do not know it yet from MSDK, let's do just a simple way for now
+        picture->key_frame = (avctx->frame_number == 0) ? 1 : 0;
+
+        if (qsv_decode->m_mfxVideoParam.IOPattern ==
+            MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+            picture->data[0]     = new_stage->out.p_surface->Data.Y;
+            picture->data[1]     = new_stage->out.p_surface->Data.VU;
+            picture->linesize[0] = new_stage->out.p_surface->Info.Width;
+            picture->linesize[1] = new_stage->out.p_surface->Info.Width;
+        } else {
+            picture->data[0]     = 0;
+            picture->data[1]     = 0;
+            picture->linesize[0] = 0;
+            picture->linesize[1] = 0;
+        }
+
+        picture->data[2]     = qsv_atom;
+        picture->linesize[2] = 0;
+
+        // assuming resource_free approach
+        if (!qsv_atom)
+            av_qsv_stage_clean(&new_stage);
+    }
+    return ret_value;
+}
+
+static av_cold int qsv_decode_end(AVCodecContext *avctx)
+{
+    mfxStatus sts;
+    av_qsv_context *qsv               = avctx->priv_data;
+    av_qsv_config *qsv_config_context = avctx->hwaccel_context;
+    int i;
+
+    if (qsv) {
+        av_qsv_space *qsv_decode = qsv->dec_space;
+        if (qsv_decode && qsv_decode->is_init_done) {
+            // todo: change to AV_LOG_INFO
+            av_log(avctx, AV_LOG_QUIET,
+                   "qsv_decode report done, max_surfaces: %u/%u , max_syncs: %u/%u\n",
+                   qsv_decode->surface_num_max_used,
+                   qsv_decode->surface_num,
+                   qsv_decode->sync_num_max_used,
+                   qsv_decode->sync_num);
+        }
+
+        if (qsv_config_context &&
+            qsv_config_context->io_pattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
+            if (qsv_config_context->allocators) {
+                sts = qsv_config_context->allocators->frame_alloc.Free(qsv_config_context->allocators,
+                                                                       &qsv_decode->response);
+                AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+            } else
+                av_log(avctx, AV_LOG_FATAL,
+                       "No QSV allocators found for cleanup\n");
+        }
+        // closing the own resources
+        av_freep(&qsv_decode->p_buf);
+
+        for (i = 0; i < qsv_decode->surface_num; i++)
+            av_freep(&qsv_decode->p_surfaces[i]);
+
+        qsv_decode->surface_num = 0;
+
+        for (i = 0; i < qsv_decode->sync_num; i++)
+            av_freep(&qsv_decode->p_sync[i]);
+
+        qsv_decode->sync_num     = 0;
+        qsv_decode->is_init_done = 0;
+
+        av_freep(&qsv->dec_space);
+
+        // closing common stuff
+        av_qsv_context_clean(qsv);
+    }
+
+    return 0;
+}
+
+static void qsv_flush_dpb(AVCodecContext *avctx)
+{
+    av_qsv_context *qsv      = avctx->priv_data;
+    av_qsv_space *qsv_decode = qsv->dec_space;
+
+    qsv_decode->bs.DataOffset = 0;
+    qsv_decode->bs.DataLength = 0;
+    qsv_decode->bs.MaxLength  = qsv_decode->p_buf_max_size;
 }
 
 AVCodec ff_h264_qsv_decoder = {
