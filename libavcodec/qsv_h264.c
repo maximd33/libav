@@ -455,14 +455,14 @@ static int qsv_dec_init(AVCodecContext *avctx)
             AV_QSV_PRINT_RET_MSG(AVERROR(ENOMEM));
             return AVERROR(ENOMEM);
         }
-        memcpy(&(qsv_decode->p_surfaces[i]->Info),
-               &(qsv_decode->request[0].Info),
+        memcpy(&qsv_decode->p_surfaces[i]->Info,
+               &qsv_decode->request[0].Info,
                sizeof(qsv_decode->p_surfaces[i]->Info));
 
         if (qsv_decode->m_mfxVideoParam.IOPattern == MFX_IOPATTERN_OUT_SYSTEM_MEMORY) {
             sts = qsv_config_context->allocators->frame_alloc.Lock(qsv_config_context->allocators,
                                                                    qsv_decode->response.mids[i],
-                                                                   &(qsv_decode->p_surfaces[i]->Data));
+                                                                   &qsv_decode->p_surfaces[i]->Data);
             AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
         }
     }
