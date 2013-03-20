@@ -351,7 +351,8 @@ static int qsv_dec_init(AVCodecContext *avctx)
     qsv->ver.Minor = AV_QSV_MSDK_VERSION_MINOR;
 
     sts = MFXInit(qsv->impl, &qsv->ver, &qsv->mfx_session);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    if (sts < MFX_ERR_NONE)
+        return sts;
 
     qsv_decode->m_mfxVideoParam.mfx.CodecId = MFX_CODEC_AVC;
     qsv_decode->m_mfxVideoParam.IOPattern   = qsv_config_context->io_pattern;
@@ -406,7 +407,8 @@ static int qsv_dec_init(AVCodecContext *avctx)
 
     sts = MFXVideoDECODE_DecodeHeader(qsv->mfx_session, &qsv_decode->bs,
                                       &qsv_decode->m_mfxVideoParam);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    if (sts < MFX_ERR_NONE)
+        return sts;
 
     qsv_decode->bs.DataLength -= sizeof(qsv_slice_code);
     qsv_decode->bs.DataFlag    = MFX_BITSTREAM_COMPLETE_FRAME;
@@ -417,7 +419,8 @@ static int qsv_dec_init(AVCodecContext *avctx)
                                      qsv_decode->request);
     if (sts == MFX_WRN_PARTIAL_ACCELERATION)
         sts = MFX_ERR_NONE;
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    if (sts < MFX_ERR_NONE)
+        return sts;
 
     qsv_decode->surface_num = FFMIN(qsv_decode->request[0].NumFrameSuggested +
                                     qsv_config_context->async_depth +
@@ -464,7 +467,8 @@ static int qsv_dec_init(AVCodecContext *avctx)
             sts = allocators->frame_alloc.Lock(allocators,
                                                qsv_decode->response.mids[i],
                                                &qsv_decode->p_surfaces[i]->Data);
-            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+            if (sts < MFX_ERR_NONE)
+                return sts;
         }
     }
 
@@ -493,7 +497,8 @@ static int qsv_dec_init(AVCodecContext *avctx)
     }
 
     sts = MFXVideoDECODE_Init(qsv->mfx_session, &qsv_decode->m_mfxVideoParam);
-    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+    if (sts < MFX_ERR_NONE)
+        return sts;
 
     qsv_decode->is_init_done = 1;
     return 0;
@@ -692,7 +697,8 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
                     sts = MFXVideoCORE_SyncOperation(qsv->mfx_session,
                                                      *new_stage->out.p_sync,
                                                      qsv_config_context->sync_need);
-                    AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+                    if (sts < MFX_ERR_NONE)
+                        return sts;
 
                     // no need to wait more -> force off
                     *new_stage->out.p_sync = 0;
@@ -725,7 +731,8 @@ static int qsv_decode_frame(AVCodecContext *avctx, void *data,
             if (sts == MFX_ERR_MORE_SURFACE || sts == MFX_ERR_MORE_SURFACE)
                 continue;
 
-            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+            if (sts < MFX_ERR_NONE)
+                return sts;
         }
 
         frame_processed = 1;
@@ -806,7 +813,8 @@ static av_cold int qsv_decode_end(AVCodecContext *avctx)
             if (allocators) {
                 sts = allocators->frame_alloc.Free(allocators,
                                                    &qsv_decode->response);
-                AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+                if (sts < MFX_ERR_NONE)
+                    return sts;
             } else
                 av_log(avctx, AV_LOG_FATAL,
                        "No QSV allocators found for cleanup\n");

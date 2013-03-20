@@ -363,7 +363,7 @@ void av_qsv_dts_pop(av_qsv_context *qsv)
 
 int av_qsv_context_clean(av_qsv_context *qsv)
 {
-    mfxStatus sts = MFX_ERR_NONE;
+    mfxStatus sts;
     int is_active = ff_qsv_atomic_dec(&qsv->is_context_active);
 
     if (is_active == 0) {
@@ -380,8 +380,8 @@ int av_qsv_context_clean(av_qsv_context *qsv)
             av_qsv_pipe_list_clean(qsv->pipes);
 
         if (qsv->mfx_session) {
-            sts = MFXClose(qsv->mfx_session);
-            AV_QSV_CHECK_RESULT(sts, MFX_ERR_NONE, sts);
+            if ((sts = MFXClose(qsv->mfx_session)) < MFX_ERR_NONE)
+                return sts;
             qsv->mfx_session = 0;
         }
     }
