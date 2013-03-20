@@ -432,8 +432,7 @@ static int qsv_dec_init(AVCodecContext *avctx)
         if (!allocators) {
             av_log(avctx, AV_LOG_INFO,
                    "Using default allocators for QSV decode\n");
-            ((av_qsv_config *)avctx->hwaccel_context)->allocators =
-                &av_qsv_default_system_allocators;
+            allocators = &av_qsv_default_system_allocators;
         }
 
         allocators->space = qsv_decode;
