@@ -110,17 +110,6 @@
 #endif
 #include <mfx/mfxvideo.h>
 
-#include "libavutil/log.h"
-
-#ifndef AV_QSV_PRINT_RET_MSG
-#define AV_QSV_PRINT_RET_MSG(ERR)                                       \
-    { av_log(NULL, AV_LOG_FATAL,                                        \
-             "Error code %d,\t%s\t%d\n", ERR, __FUNCTION__, __LINE__);  \
-    }
-#endif
-
-#define AV_QSV_CHECK_RESULT(P, X, ERR)  { if ((X) > (P)) { AV_QSV_PRINT_RET_MSG(ERR); return ERR; } }
-
 #define AV_QSV_ID_BUFFER MFX_MAKEFOURCC('B', 'U', 'F', 'F')
 #define AV_QSV_ID_FRAME  MFX_MAKEFOURCC('F', 'R', 'M', 'E')
 
